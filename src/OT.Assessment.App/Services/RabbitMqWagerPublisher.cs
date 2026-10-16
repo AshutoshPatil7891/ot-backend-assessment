@@ -42,6 +42,32 @@ namespace OT.Assessment.App.Services
                 cancellationToken: cancellationToken);
         }
 
+        //private async Task ConnectAsync(CancellationToken cancellationToken)
+        //{
+        //    if (_connection != null && _connection.IsOpen &&
+        //        _channel != null && _channel.IsOpen)
+        //    {
+        //        return;
+        //    }
+
+        //    var factory = new ConnectionFactory
+        //    {
+        //        HostName = _settings.HostName,
+        //        Port = _settings.Port,
+        //        UserName = _settings.UserName,
+        //        Password = _settings.Password
+        //    };
+
+        //    if (_connection == null || !_connection.IsOpen)
+        //    {
+        //        _connection = await factory.CreateConnectionAsync(cancellationToken);
+        //    }
+
+        //    _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
+
+        //    await DeclareQueuesAsync(cancellationToken);
+        //}
+
         private async Task ConnectAsync(CancellationToken cancellationToken)
         {
             if (_connection != null && _connection.IsOpen &&
@@ -50,22 +76,36 @@ namespace OT.Assessment.App.Services
                 return;
             }
 
-            var factory = new ConnectionFactory
+            await _connectLock.WaitAsync(cancellationToken);
+            try
             {
-                HostName = _settings.HostName,
-                Port = _settings.Port,
-                UserName = _settings.UserName,
-                Password = _settings.Password
-            };
+                if (_connection != null && _connection.IsOpen &&
+                    _channel != null && _channel.IsOpen)
+                {
+                    return;
+                }
 
-            if (_connection == null || !_connection.IsOpen)
-            {
-                _connection = await factory.CreateConnectionAsync(cancellationToken);
+                if (_connection == null || !_connection.IsOpen)
+                {
+                    var factory = new ConnectionFactory
+                    {
+                        HostName = _settings.HostName,
+                        Port = _settings.Port,
+                        UserName = _settings.UserName,
+                        Password = _settings.Password
+                    };
+
+                    _connection = await factory.CreateConnectionAsync(cancellationToken);
+                }
+
+                _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
+
+                await DeclareQueuesAsync(cancellationToken);
             }
-
-            _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
-
-            await DeclareQueuesAsync(cancellationToken);
+            finally
+            {
+                _connectLock.Release();
+            }
         }
 
         private async Task DeclareQueuesAsync(CancellationToken cancellationToken)
