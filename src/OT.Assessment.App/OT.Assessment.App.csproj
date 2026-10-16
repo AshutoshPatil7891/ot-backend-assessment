@@ -14,4 +14,8 @@
 		<PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="6.6.2" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <ProjectReference Include="..\OT.Assessment.Common\OT.Assessment.Common.csproj" />
+	</ItemGroup>
+
 </Project>
