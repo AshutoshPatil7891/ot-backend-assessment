@@ -98,7 +98,13 @@ namespace OT.Assessment.App.Services
                     _connection = await factory.CreateConnectionAsync(cancellationToken);
                 }
 
-                _channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
+                //_channel = await _connection.CreateChannelAsync(cancellationToken: cancellationToken);
+                var channelOptions = new CreateChannelOptions(
+                    publisherConfirmationsEnabled: true,
+                    publisherConfirmationTrackingEnabled: true);
+                _channel = await _connection.CreateChannelAsync(channelOptions, cancellationToken);
+
+
 
                 await DeclareQueuesAsync(cancellationToken);
             }
