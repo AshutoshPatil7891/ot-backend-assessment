@@ -9,7 +9,7 @@ using System.Threading.Channels;
 
 namespace OT.Assessment.App.Services
 {
-    public class RabbitMqWagerPublisher : IWagerPublisher, IAsyncDisposable
+    public class RabbitMqBetPublisher : IBetPublisher, IAsyncDisposable
     {
         private readonly RabbitMqSettings _settings;
         private IConnection _connection;
@@ -19,18 +19,18 @@ namespace OT.Assessment.App.Services
 
 
 
-        public RabbitMqWagerPublisher(IOptions<RabbitMqSettings> options)
+        public RabbitMqBetPublisher(IOptions<RabbitMqSettings> options)
         {
             _settings = options.Value;
         }
 
         public async Task PublishAsync(
-    CasinoWagerMesg wager,
+    CasinoBetMesg bet,
     CancellationToken cancellationToken = default)
         {
             await ConnectAsync(cancellationToken);
 
-            var message = JsonSerializer.SerializeToUtf8Bytes(wager);
+            var message = JsonSerializer.SerializeToUtf8Bytes(bet);
 
             var properties = new BasicProperties
             {

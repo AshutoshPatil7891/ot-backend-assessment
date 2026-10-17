@@ -23,9 +23,9 @@ CREATE TABLE Game
     CONSTRAINT UQ_Game_Name_Provider UNIQUE (Name, Provider)
 );
 
-CREATE TABLE CasinoWager
+CREATE TABLE CasinoBet
 (
-    WagerId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+    BetId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
     AccountId UNIQUEIDENTIFIER NOT NULL,
     GameId INT NOT NULL,
     Amount DECIMAL(19,4) NOT NULL,
@@ -34,16 +34,16 @@ CREATE TABLE CasinoWager
     Duration BIGINT NOT NULL,
     TransactionId UNIQUEIDENTIFIER NOT NULL,
 
-    CONSTRAINT FK_CasinoWager_Player
+    CONSTRAINT FK_CasinoBet_Player
         FOREIGN KEY (AccountId) REFERENCES Player(AccountId),
 
-    CONSTRAINT FK_CasinoWager_Game
+    CONSTRAINT FK_CasinoBet_Game
         FOREIGN KEY (GameId) REFERENCES Game(GameId)
 );
 GO
 
-CREATE INDEX IX_CasinoWager_AccountId_CreatedDateTime
-ON CasinoWager(AccountId, CreatedDateTime DESC);
+CREATE INDEX IX_CasinoBet_AccountId_CreatedDateTime
+ON CasinoBet(AccountId, CreatedDateTime DESC);
 GO
 
 CREATE TABLE PlayerSpendTotal
@@ -59,9 +59,9 @@ GO
 CREATE INDEX IX_PlayerSpendTotal_TotalAmountSpend
 ON PlayerSpendTotal(TotalAmountSpend DESC);
 GO
-CREATE TYPE CasinoWagerType AS TABLE
+CREATE TYPE CasinoBetType AS TABLE
 (
-    WagerId UNIQUEIDENTIFIER NOT NULL,
+    BetId UNIQUEIDENTIFIER NOT NULL,
     AccountId UNIQUEIDENTIFIER NOT NULL,
     Username NVARCHAR(100) NOT NULL,
     CountryCode CHAR(2) NULL,
@@ -77,7 +77,7 @@ CREATE TYPE CasinoWagerType AS TABLE
 GO
 
 --------------------------------------------GET-SP--------------------------------------------
-CREATE PROCEDURE usp_GetPlayerCasinoWagers
+CREATE PROCEDURE usp_GetPlayerCasinoBets
     @AccountId UNIQUEIDENTIFIER,
     @Page INT,
     @PageSize INT
@@ -86,13 +86,13 @@ BEGIN
     SET NOCOUNT ON;
 
     SELECT
-        w.WagerId,
+        w.BetId,
         g.Name AS Game,
         g.Provider,
         w.Amount,
         w.CreatedDateTime AS CreatedDate,
         COUNT(*) OVER () AS Total
-    FROM CasinoWager w
+    FROM CasinoBet w
     INNER JOIN Game g ON w.GameId = g.GameId
     WHERE w.AccountId = @AccountId
     ORDER BY w.CreatedDateTime DESC
@@ -117,8 +117,8 @@ BEGIN
 END;
 GO
 
-CREATE PROCEDURE usp_InsertCasinoWagers
-    @Wagers CasinoWagerType READONLY
+CREATE PROCEDURE usp_InsertCasinoBets
+    @Bets CasinoBetType READONLY
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -126,24 +126,24 @@ BEGIN
 
     BEGIN TRANSACTION;
 
-    -- one row per new wager: drops repeats inside the batch and wagers already stored
+    -- one row per new bet: drops repeats inside the batch and bets already stored
     SELECT
-        w.WagerId, w.AccountId, w.Username, w.CountryCode,
+        w.BetId, w.AccountId, w.Username, w.CountryCode,
         w.GameName, w.Provider, w.Theme, w.Amount,
         w.CreatedDateTime, w.NumberOfBets, w.Duration, w.TransactionId
-    INTO #NewWagers
+    INTO #NewBets
     FROM
     (
-        SELECT *, ROW_NUMBER() OVER (PARTITION BY WagerId ORDER BY CreatedDateTime) AS RowNum
-        FROM @Wagers
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY BetId ORDER BY CreatedDateTime) AS RowNum
+        FROM @Bets
     ) w
     WHERE w.RowNum = 1
-      AND NOT EXISTS (SELECT 1 FROM CasinoWager c WHERE c.WagerId = w.WagerId);
+      AND NOT EXISTS (SELECT 1 FROM CasinoBet c WHERE c.BetId = w.BetId);
 
     -- one row per player (same player can arrive with different country codes)
     INSERT INTO Player (AccountId, Username, CountryCode)
     SELECT n.AccountId, MAX(n.Username), MAX(n.CountryCode)
-    FROM #NewWagers n
+    FROM #NewBets n
     WHERE NOT EXISTS
     (
         SELECT 1 FROM Player p WITH (UPDLOCK, HOLDLOCK)
@@ -153,7 +153,7 @@ BEGIN
 
     INSERT INTO Game (Name, Provider, Theme)
     SELECT n.GameName, n.Provider, MAX(n.Theme)
-    FROM #NewWagers n
+    FROM #NewBets n
     WHERE NOT EXISTS
     (
         SELECT 1 FROM Game g WITH (UPDLOCK, HOLDLOCK)
@@ -161,12 +161,12 @@ BEGIN
     )
     GROUP BY n.GameName, n.Provider;
 
-    INSERT INTO CasinoWager
-        (WagerId, AccountId, GameId, Amount, CreatedDateTime, NumberOfBets, Duration, TransactionId)
+    INSERT INTO CasinoBet
+        (BetId, AccountId, GameId, Amount, CreatedDateTime, NumberOfBets, Duration, TransactionId)
     SELECT
-        n.WagerId, n.AccountId, g.GameId, n.Amount,
+        n.BetId, n.AccountId, g.GameId, n.Amount,
         n.CreatedDateTime, n.NumberOfBets, n.Duration, n.TransactionId
-    FROM #NewWagers n
+    FROM #NewBets n
     INNER JOIN Game g ON g.Name = n.GameName AND g.Provider = n.Provider;
 
     UPDATE t
@@ -175,7 +175,7 @@ BEGIN
     INNER JOIN
     (
         SELECT AccountId, SUM(Amount) AS Total
-        FROM #NewWagers
+        FROM #NewBets
         GROUP BY AccountId
     ) s ON s.AccountId = t.AccountId;
 
@@ -184,7 +184,7 @@ BEGIN
     FROM
     (
         SELECT AccountId, SUM(Amount) AS Total
-        FROM #NewWagers
+        FROM #NewBets
         GROUP BY AccountId
     ) s
     WHERE NOT EXISTS

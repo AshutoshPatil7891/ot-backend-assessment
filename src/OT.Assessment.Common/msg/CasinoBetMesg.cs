@@ -3,9 +3,10 @@ using System.Text.Json.Serialization;
 
 namespace OT.Assessment.Common.msg
 {
-    public class CasinoWagerMesg
+    public class CasinoBetMesg
     {
-        public Guid WagerId { get; set; }        
+        [JsonPropertyName("wagerId")]
+        public Guid BetId { get; set; }        
         public Guid AccountId { get; set; }        
         public string Username { get; set; }        
         public string CountryCode { get; set; }        
