@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using OT.Assessment.App.Services;
 using OT.Assessment.Common.msg;
+using OT.Assessment.Common.Resp;
 
 namespace OT.Assessment.App.Controllers
 {
@@ -10,12 +11,17 @@ namespace OT.Assessment.App.Controllers
     {
         private readonly IBetPublisher _publisher;
         private readonly ILogger<PlayerController> _logger;
+        private readonly IPlayerReader _reader;
 
+
+        //constructor
         public PlayerController(
-            IBetPublisher publisher,
-            ILogger<PlayerController> logger)
+      IBetPublisher publisher,
+      IPlayerReader reader,
+      ILogger<PlayerController> logger)
         {
             _publisher = publisher;
+            _reader = reader;
             _logger = logger;
         }
         /// <summary>
@@ -39,7 +45,7 @@ namespace OT.Assessment.App.Controllers
                 return BadRequest("Bet is missing required fields.");
             }
 
-            
+
             bet.CreatedDateTime = DateTimeOffset.UtcNow;
 
             try
@@ -57,5 +63,42 @@ namespace OT.Assessment.App.Controllers
                 return StatusCode(503);
             }
         }
+
+
+        [HttpGet("{playerId:guid}/casino")]
+        public async Task<ActionResult<PagedResp<PlayerBetResp>>> GetPlayerBets(
+            Guid playerId,
+            CancellationToken cancellationToken,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
+        {
+            if (page < 1 || pageSize < 1 || pageSize > 100)
+            {
+                return BadRequest("Invalid page or pageSize.");
+            }
+
+            var result = await _reader.GetPlayerBetsAsync(
+                playerId, page, pageSize, cancellationToken);
+
+            return Ok(result);
+        }
+
+        [HttpGet("topSpenders")]
+        public async Task<ActionResult<List<TopSpenderResp>>> GetTopSpenders(
+            CancellationToken cancellationToken,
+            [FromQuery] int count = 10)
+        {
+            if (count < 1 || count > 100)
+            {
+                return BadRequest("Count must be between 1 and 100.");
+            }
+
+            var result = await _reader.GetTopSpendersAsync(count, cancellationToken);
+
+            return Ok(result);
+        }
+
+
     }
+
 }
