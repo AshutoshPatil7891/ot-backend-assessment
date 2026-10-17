@@ -1,11 +1,19 @@
 using System.Reflection;
+using OT.Assessment.App.Services;
+using OT.Assessment.Common.Settings;
+
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
+builder.Services.Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"));
+builder.Services.AddSingleton<IWagerPublisher, RabbitMqWagerPublisher>();
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckl
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+
 builder.Services.AddSwaggerGen(options =>
 {
     var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
