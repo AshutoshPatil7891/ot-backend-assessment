@@ -1,8 +1,11 @@
-﻿using System.Text.Json;
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using OT.Assessment.Common.msg;
 using OT.Assessment.Common.Settings;
 using RabbitMQ.Client;
+using System.Runtime;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Channels;
 
 namespace OT.Assessment.App.Services
 {
@@ -12,6 +15,8 @@ namespace OT.Assessment.App.Services
         private IConnection _connection;
         private IChannel _channel;
         private readonly SemaphoreSlim _connectLock = new(1, 1);
+        private readonly SemaphoreSlim _publishLock = new(1, 1);
+
 
 
         public RabbitMqWagerPublisher(IOptions<RabbitMqSettings> options)
@@ -20,8 +25,8 @@ namespace OT.Assessment.App.Services
         }
 
         public async Task PublishAsync(
-            CasinoWagerMesg wager,
-            CancellationToken cancellationToken = default)
+    CasinoWagerMesg wager,
+    CancellationToken cancellationToken = default)
         {
             await ConnectAsync(cancellationToken);
 
@@ -33,14 +38,24 @@ namespace OT.Assessment.App.Services
                 ContentType = "application/json"
             };
 
-            await _channel.BasicPublishAsync(
-                exchange: string.Empty,
-                routingKey: _settings.QueueName,
-                mandatory: false,
-                basicProperties: properties,
-                body: message,
-                cancellationToken: cancellationToken);
+            await _publishLock.WaitAsync(cancellationToken);
+            try
+            {
+                await _channel.BasicPublishAsync(
+                    exchange: string.Empty,
+                    routingKey: _settings.QueueName,
+                    mandatory: false,
+                    basicProperties: properties,
+                    body: message,
+                    cancellationToken: cancellationToken);
+            }
+            finally
+            {
+                _publishLock.Release();
+            }
         }
+
+
 
         //private async Task ConnectAsync(CancellationToken cancellationToken)
         //{
