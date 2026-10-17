@@ -31,7 +31,7 @@ namespace OT.Assessment.App.Controllers
 
 
 
-        [HttpPost("casinobet")]
+        [HttpPost("casinowager")]
         public async Task<IActionResult> PostCasinoBet(
             CasinoBetMesg bet,
             CancellationToken cancellationToken)
