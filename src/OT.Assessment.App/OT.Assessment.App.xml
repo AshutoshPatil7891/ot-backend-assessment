@@ -4,5 +4,11 @@
         <name>OT.Assessment.App</name>
     </assembly>
     <members>
+        <member name="M:OT.Assessment.App.Controllers.PlayerController.PostCasinoBet(OT.Assessment.Common.msg.CasinoBetMesg,System.Threading.CancellationToken)">
+            <summary>
+            Sends one bet data to the RabbitMQ queue and waits until RabbitMQ confirms it has received it.
+            Connects on first use and reuses the same connection afterwards.
+            </summary>
+        </member>
     </members>
 </doc>

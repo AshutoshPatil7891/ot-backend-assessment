@@ -18,14 +18,19 @@ namespace OT.Assessment.App.Controllers
             _publisher = publisher;
             _logger = logger;
         }
+        /// <summary>
+        /// Sends one bet data to the RabbitMQ queue and waits until RabbitMQ confirms it has received it.
+        /// Connects on first use and reuses the same connection afterwards.
+        /// </summary>
 
-        [HttpPost("casinowager")]
+
+
+        [HttpPost("casinobet")]
         public async Task<IActionResult> PostCasinoBet(
             CasinoBetMesg bet,
             CancellationToken cancellationToken)
         {
-            if (bet.BetId == Guid.Empty ||
-                bet.AccountId == Guid.Empty ||
+            if (bet.AccountId == Guid.Empty ||
                 string.IsNullOrWhiteSpace(bet.Username) ||
                 string.IsNullOrWhiteSpace(bet.GameName) ||
                 string.IsNullOrWhiteSpace(bet.Provider) ||
@@ -33,6 +38,9 @@ namespace OT.Assessment.App.Controllers
             {
                 return BadRequest("Bet is missing required fields.");
             }
+
+            
+            bet.CreatedDateTime = DateTimeOffset.UtcNow;
 
             try
             {
