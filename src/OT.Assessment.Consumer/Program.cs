@@ -1,6 +1,11 @@
 ﻿using Microsoft.Extensions.Configuration;
+using OT.Assessment.Common.Settings;
+using OT.Assessment.Consumer.Services;
+using OT.Assessment.Consumer.Settings;
+
 
 var host = Host.CreateDefaultBuilder(args)
+
     .ConfigureAppConfiguration(config =>
     {
         config.SetBasePath(Directory.GetCurrentDirectory())
@@ -10,7 +15,12 @@ var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((context, services) =>
     {
         //configure services
-      
+        services.Configure<RabbitMqSettings>(context.Configuration.GetSection("RabbitMq"));
+        services.Configure<ConsumerSettings>(context.Configuration.GetSection("Consumer"));
+        services.AddSingleton<IBetWriter, SqlBetWriter>();
+        services.AddHostedService<BetConsumerService>();
+
+
     })
     .Build();
 
