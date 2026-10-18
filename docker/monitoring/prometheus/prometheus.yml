@@ -1,0 +1,33 @@
+# What Prometheus collects, and from where (every 5 seconds).
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  # RabbitMQ totals (connections, memory, message rates)
+  - job_name: rabbitmq
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:15692"]
+
+  # RabbitMQ per queue (casino-bets and casino-bets.dead)
+  - job_name: rabbitmq-queues
+    metrics_path: /metrics/detailed
+    params:
+      family: ["queue_coarse_metrics"]
+    static_configs:
+      - targets: ["host.docker.internal:15692"]
+
+  # The API (https; the local development certificate is not trusted, so it is not checked)
+  - job_name: ot-api
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:7120"]
+
+  # The Consumer
+  - job_name: ot-consumer
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["host.docker.internal:9101"]

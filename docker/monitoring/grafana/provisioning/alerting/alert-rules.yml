@@ -1,0 +1,412 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: ot-assessment
+    folder: OT Assessment
+    interval: 30s
+    rules:
+      - uid: ot-dead-letter
+        title: "Dead-letter queue has messages"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "rabbitmq_detailed_queue_messages_ready{queue=\"casino-bets.dead\"}"
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "Dead-letter queue has messages"
+          description: "Messages that can never be saved are waiting in casino-bets.dead. Inspect them in the RabbitMQ management UI."
+        labels:
+          severity: critical
+        isPaused: false
+      - uid: ot-queue-backlog
+        title: "Queue backlog is growing"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "rabbitmq_detailed_queue_messages_ready{queue=\"casino-bets\"}"
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [5000]
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: "Queue backlog is growing"
+          description: "More than 5000 bets have been waiting in casino-bets for 2 minutes. The Consumer is slow, stuck or down."
+        labels:
+          severity: warning
+        isPaused: false
+      - uid: ot-api-down
+        title: "API is down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "up{job=\"ot-api\"}"
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+        noDataState: Alerting
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: "API is down"
+          description: "Prometheus cannot read the API metrics for 1 minute."
+        labels:
+          severity: critical
+        isPaused: false
+      - uid: ot-consumer-down
+        title: "Consumer is down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "up{job=\"ot-consumer\"}"
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+        noDataState: Alerting
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: "Consumer is down"
+          description: "Prometheus cannot read the Consumer metrics for 1 minute. Bets will pile up in the queue."
+        labels:
+          severity: critical
+        isPaused: false
+      - uid: ot-rabbitmq-down
+        title: "RabbitMQ is down"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "up{job=\"rabbitmq\"}"
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator:
+                    type: lt
+                    params: [1]
+        noDataState: Alerting
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: "RabbitMQ is down"
+          description: "Prometheus cannot read RabbitMQ metrics for 1 minute. The API will return 503."
+        labels:
+          severity: critical
+        isPaused: false
+      - uid: ot-publish-failures
+        title: "API could not queue bets"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "increase(ot_api_bets_publish_failed_total[5m])"
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "API could not queue bets"
+          description: "The API returned 503 because it could not publish to RabbitMQ in the last 5 minutes."
+        labels:
+          severity: critical
+        isPaused: false
+      - uid: ot-save-retries
+        title: "Consumer is retrying database saves"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "increase(ot_consumer_save_retries_total[5m])"
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [0]
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: "Consumer is retrying database saves"
+          description: "The Consumer had to retry saving to SQL Server in the last 5 minutes. Check the database."
+        labels:
+          severity: warning
+        isPaused: false
+      - uid: ot-slow-publish
+        title: "Queueing a bet is slow (p95 over 10 s)"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "histogram_quantile(0.95, sum(rate(ot_api_publish_duration_seconds_bucket[2m])) by (le))"
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [10]
+        noDataState: OK
+        execErrState: Error
+        for: 2m
+        annotations:
+          summary: "Queueing a bet is slow (p95 over 10 s)"
+          description: "95 percent of bets take more than 10 seconds to queue. The API publish path is saturated."
+        labels:
+          severity: warning
+        isPaused: false
+      - uid: ot-high-memory
+        title: "An app uses more than 1.5 GB of memory"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: "max(process_working_set_bytes{job=~\"ot-.*\"})"
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              refId: C
+              conditions:
+                - evaluator:
+                    type: gt
+                    params: [1500000000]
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: "An app uses more than 1.5 GB of memory"
+          description: "The API or the Consumer has used more than 1.5 GB of memory for 5 minutes."
+        labels:
+          severity: warning
+        isPaused: false

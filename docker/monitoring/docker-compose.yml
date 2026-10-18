@@ -1,0 +1,41 @@
+# Prometheus (collects metrics) and Grafana (dashboards and alerts) for the OT assessment.
+# Start with docker-up.bat. Prometheus: http://localhost:9090   Grafana: http://localhost:3000 (admin / admin, local only)
+# The apps and RabbitMQ run on the host, so Prometheus reaches them as host.docker.internal.
+services:
+  prometheus:
+    image: prom/prometheus:v3.15.0
+    container_name: ot-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    mem_limit: 512m
+
+  grafana:
+    image: grafana/grafana:13.2.3
+    container_name: ot-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin   # local development only
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    mem_limit: 768m
+
+volumes:
+  prometheus-data:
+  grafana-data:
