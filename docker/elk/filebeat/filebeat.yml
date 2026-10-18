@@ -1,0 +1,62 @@
+# Reads the daily log files of both apps and sends every log line to Elasticsearch.
+# A log line looks like:  2026-10-18 17:47:38.711 +05:30 [INF] Now listening on: https://localhost:7120
+filebeat.inputs:
+  - type: filestream
+    id: ot-api-logs
+    paths:
+      - /logs/api/*/*.log
+    fields:
+      service: ot-api
+    fields_under_root: true
+    parsers:
+      - multiline:          # a line that does not start with a date (for example a stack trace) belongs to the line before it
+          type: pattern
+          pattern: '^\d{4}-\d{2}-\d{2} '
+          negate: true
+          match: after
+
+  - type: filestream
+    id: ot-consumer-logs
+    paths:
+      - /logs/consumer/*/*.log
+    fields:
+      service: ot-consumer
+    fields_under_root: true
+    parsers:
+      - multiline:
+          type: pattern
+          pattern: '^\d{4}-\d{2}-\d{2} '
+          negate: true
+          match: after
+
+processors:
+  # split the line into time, level (INF / WRN / ERR) and text
+  - dissect:
+      tokenizer: "%{log_time} [%{log_level}] %{log_message}"
+      field: message
+      target_prefix: ""
+      ignore_failure: true
+  # use the time written in the log line as the event time
+  - timestamp:
+      field: log_time
+      layouts:
+        - "2006-01-02 15:04:05.000 -07:00"
+      ignore_failure: true
+  # which folder the line came from: info, warning or error
+  - dissect:
+      tokenizer: "/logs/%{app}/%{log_folder}/%{file}"
+      field: log.file.path
+      target_prefix: ""
+      ignore_failure: true
+  - drop_fields:
+      fields: ["app", "file", "agent", "ecs", "input", "host"]
+      ignore_missing: true
+
+output.elasticsearch:
+  hosts: ["elasticsearch:9200"]
+  index: "ot-logs-%{+yyyy.MM.dd}"
+
+# plain daily indices (ot-logs-2026.10.18): no Filebeat template, no data stream, no index life-cycle policy
+setup.ilm.enabled: false
+setup.dsl.enabled: false
+setup.template.enabled: false

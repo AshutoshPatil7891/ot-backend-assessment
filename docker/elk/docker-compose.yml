@@ -1,0 +1,56 @@
+# ELK for the OT assessment: Elasticsearch stores the logs, Filebeat reads the log files the API and the
+# Consumer write (src/*/logs/info, warning, error), Kibana searches them.
+# Start with docker-up.bat. Kibana: http://localhost:5601   Elasticsearch: http://localhost:9200
+# Local development setup: security is switched off and Elasticsearch gets a small memory heap (512 MB).
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: ot-elasticsearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+    mem_limit: 1280m
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: ot-kibana
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    mem_limit: 900m
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.13.4
+    container_name: ot-filebeat
+    restart: unless-stopped
+    user: root
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    command: ["filebeat", "-e", "--strict.perms=false"]
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - ../../src/OT.Assessment.App/logs:/logs/api:ro
+      - ../../src/OT.Assessment.Consumer/logs:/logs/consumer:ro
+      - filebeat-data:/usr/share/filebeat/data
+    mem_limit: 256m
+
+volumes:
+  elasticsearch-data:
+  filebeat-data:
