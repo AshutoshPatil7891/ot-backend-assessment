@@ -180,6 +180,9 @@ BEGIN
     FROM #NewBets n
     INNER JOIN Game g ON g.Name = n.GameName AND g.Provider = n.Provider;
 
+    -- how many rows were really added (bets that were already stored or repeated in the batch are not counted)
+    DECLARE @Inserted INT = @@ROWCOUNT;
+
     UPDATE t
     SET t.TotalAmountSpend = t.TotalAmountSpend + s.Total
     FROM PlayerSpendTotal t
@@ -205,5 +208,7 @@ BEGIN
     );
 
     COMMIT TRANSACTION;
+
+    SELECT @Inserted AS Inserted;
 END;
 GO

@@ -16,7 +16,7 @@ namespace OT.Assessment.Consumer.Services
             _connectionString = configuration.GetConnectionString("DatabaseConnection");
         }
 
-        public async Task WriteBatchAsync(
+        public async Task<int> WriteBatchAsync(
             IReadOnlyList<CasinoBetMesg> bets,
             CancellationToken cancellationToken = default)
         {
@@ -33,7 +33,7 @@ namespace OT.Assessment.Consumer.Services
                 commandType: CommandType.StoredProcedure,
                 cancellationToken: cancellationToken);
 
-            await connection.ExecuteAsync(command);
+            return await connection.QuerySingleAsync<int>(command);
         }
 
         private static DataTable BuildTable(IReadOnlyList<CasinoBetMesg> bets)

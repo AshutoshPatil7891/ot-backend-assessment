@@ -194,13 +194,16 @@ namespace OT.Assessment.Consumer.Services
 
             try
             {
-                await WriteWithRetryAsync(batch.Select(b => b.Bet).ToList(), cancellationToken);
+                var inserted = await WriteWithRetryAsync(batch.Select(b => b.Bet).ToList(), cancellationToken);
+                var skipped = batch.Count - inserted;
 
                 // All earlier delivery tags are already settled, so one multiple-ack covers the batch.
                 await _channel.BasicAckAsync(lastTag, true, cancellationToken);
-                _logger.LogInformation("Saved {Count} bets in {ElapsedMs} ms ({Waiting} more waiting in memory)",
-                    batch.Count, timer.ElapsedMilliseconds, _buffer.Reader.Count);
-                ConsumerMetrics.BetsSaved.Inc(batch.Count);
+                _logger.LogInformation(
+                    "Saved {Inserted} of {Count} bets in {ElapsedMs} ms ({Skipped} repeats skipped, {Waiting} more waiting in memory)",
+                    inserted, batch.Count, timer.ElapsedMilliseconds, skipped, _buffer.Reader.Count);
+                ConsumerMetrics.BetsSaved.Inc(inserted);
+                ConsumerMetrics.BetsSkipped.Inc(skipped);
                 ConsumerMetrics.Batches.Inc();
                 ConsumerMetrics.BatchDuration.Observe(timer.Elapsed.TotalSeconds);
                 ConsumerMetrics.BufferedBets.Set(_buffer.Reader.Count);
@@ -218,14 +221,13 @@ namespace OT.Assessment.Consumer.Services
             }
         }
 
-        private async Task WriteWithRetryAsync(IReadOnlyList<CasinoBetMesg> bets, CancellationToken cancellationToken)
+        private async Task<int> WriteWithRetryAsync(IReadOnlyList<CasinoBetMesg> bets, CancellationToken cancellationToken)
         {
             for (var attempt = 1; ; attempt++)
             {
                 try
                 {
-                    await _writer.WriteBatchAsync(bets, cancellationToken);
-                    return;
+                    return await _writer.WriteBatchAsync(bets, cancellationToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException
                                            && !IsDataError(ex)
@@ -244,9 +246,10 @@ namespace OT.Assessment.Consumer.Services
             {
                 try
                 {
-                    await _writer.WriteBatchAsync(new[] { item.Bet }, cancellationToken);
+                    var inserted = await _writer.WriteBatchAsync(new[] { item.Bet }, cancellationToken);
                     await _channel.BasicAckAsync(item.DeliveryTag, false, cancellationToken);
-                    ConsumerMetrics.BetsSaved.Inc();
+                    ConsumerMetrics.BetsSaved.Inc(inserted);
+                    ConsumerMetrics.BetsSkipped.Inc(1 - inserted);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException && IsDataError(ex))
                 {

@@ -19,7 +19,10 @@ namespace OT.Assessment.Consumer.Monitoring
         }
 
         public static readonly Counter BetsSaved = Prometheus.Metrics.CreateCounter(
-            "ot_consumer_bets_saved_total", "Bets saved to SQL Server and acknowledged.");
+            "ot_consumer_bets_saved_total", "Bets added to SQL Server as new rows (equals the rows in the CasinoBet table).");
+
+        public static readonly Counter BetsSkipped = Prometheus.Metrics.CreateCounter(
+            "ot_consumer_bets_skipped_total", "Messages acknowledged without a new row because the bet was already stored (repeated BetId).");
 
         public static readonly Counter Batches = Prometheus.Metrics.CreateCounter(
             "ot_consumer_batches_total", "Batches written to SQL Server.");
