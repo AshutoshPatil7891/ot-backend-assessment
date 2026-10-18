@@ -1,0 +1,22 @@
+# RabbitMQ for the OT assessment: AMQP on 5672, management UI on 15672,
+# Prometheus metrics on 15692 (read by the monitoring stack in docker/monitoring).
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ot-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+      - "15692:15692"
+    volumes:
+      - ./enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  rabbitmq-data:
