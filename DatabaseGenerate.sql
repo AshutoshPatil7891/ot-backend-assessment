@@ -1,10 +1,13 @@
 
-CREATE DATABASE OT_Assessment_DB;
+IF NOT EXISTS (SELECT 1 FROM sys.databases WHERE name = 'OT_Assessment_DB')
+    CREATE DATABASE OT_Assessment_DB;
 GO
+
 
 USE OT_Assessment_DB;
 GO
 
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Player')
 CREATE TABLE Player
 (
     AccountId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
@@ -13,6 +16,7 @@ CREATE TABLE Player
 );
 GO
 
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Game')
 CREATE TABLE Game
 (
     GameId INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
@@ -22,7 +26,9 @@ CREATE TABLE Game
 
     CONSTRAINT UQ_Game_Name_Provider UNIQUE (Name, Provider)
 );
+GO
 
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'CasinoBet')
 CREATE TABLE CasinoBet
 (
     BetId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
@@ -42,10 +48,12 @@ CREATE TABLE CasinoBet
 );
 GO
 
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_CasinoBet_AccountId_CreatedDateTime' AND object_id = OBJECT_ID('dbo.CasinoBet'))
 CREATE INDEX IX_CasinoBet_AccountId_CreatedDateTime
 ON CasinoBet(AccountId, CreatedDateTime DESC);
 GO
 
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'PlayerSpendTotal')
 CREATE TABLE PlayerSpendTotal
 (
     AccountId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
@@ -56,9 +64,12 @@ CREATE TABLE PlayerSpendTotal
 );
 GO
 
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_PlayerSpendTotal_TotalAmountSpend' AND object_id = OBJECT_ID('dbo.PlayerSpendTotal'))
 CREATE INDEX IX_PlayerSpendTotal_TotalAmountSpend
 ON PlayerSpendTotal(TotalAmountSpend DESC);
 GO
+
+IF TYPE_ID('dbo.CasinoBetType') IS NULL
 CREATE TYPE CasinoBetType AS TABLE
 (
     BetId UNIQUEIDENTIFIER NOT NULL,
@@ -77,7 +88,7 @@ CREATE TYPE CasinoBetType AS TABLE
 GO
 
 --------------------------------------------GET-SP--------------------------------------------
-CREATE PROCEDURE usp_GetPlayerCasinoBets
+CREATE OR ALTER PROCEDURE usp_GetPlayerCasinoBets
     @AccountId UNIQUEIDENTIFIER,
     @Page INT,
     @PageSize INT
@@ -101,7 +112,7 @@ BEGIN
 END;
 GO
 
-CREATE PROCEDURE usp_GetTopSpenders
+CREATE OR ALTER PROCEDURE usp_GetTopSpenders
     @Count INT
 AS
 BEGIN
@@ -117,7 +128,7 @@ BEGIN
 END;
 GO
 
-CREATE PROCEDURE usp_InsertCasinoBets
+CREATE OR ALTER PROCEDURE usp_InsertCasinoBets
     @Bets CasinoBetType READONLY
 AS
 BEGIN
