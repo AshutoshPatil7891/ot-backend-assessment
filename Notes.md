@@ -18,6 +18,21 @@ Tester -> POST api/player/casinowager -> API -> RabbitMQ (casino-bets) -> Consum
 | `OT.Assessment.UnitTests` | xUnit tests for the controller and message contract |
 | `OT.Assessment.Tester` | The provided load tester (not changed) |
 
+## Bonus: extras added beyond the brief
+
+The brief's last item asks us to "surprise" with valuable additions. These were added on top of the required work. The required part (API, Consumer, database) does not depend on any of them.
+
+- **Monitoring system (Prometheus and Grafana).** The API and the Consumer expose metrics, RabbitMQ exposes queue metrics, and a ready-made Grafana dashboard (17 panels) shows: whether RabbitMQ, the API and the Consumer are up, queue depth and the dead-letter queue, bets per second, time to queue and to save, **CPU and memory of the API, the Consumer and RabbitMQ**, request counts, and saved versus repeated bets.
+- **Alerts.** Nine Grafana alert rules, for example dead-letter queue not empty, queue backlog, API / Consumer / RabbitMQ down, publish failures, slow publishing and high memory. I tested them by triggering the dead-letter alert and by stopping the apps.
+- **Searchable logs (ELK: Elasticsearch, Kibana and Filebeat).** The logs of both apps can be searched by service, level and folder in Kibana.
+- **File logging.** Both apps write daily log files, with information, warning and error entries in separate folders.
+- **One-command RabbitMQ (Docker Compose)** with its metrics plugin on. The README already linked to `docker/RabbitMQ/docker-up.bat`; that file now exists.
+- **Reliability.** Publisher confirms, a dead-letter queue for messages that can never be saved, retries for temporary database problems, and idempotent inserts (a repeated bet is stored once and counted as "skipped").
+- **Numbers that add up.** The dashboard and the Consumer log show how many messages were processed, how many became new rows (equal to the table) and how many were repeats skipped. So Tester count = API accepted = RabbitMQ received = saved + skipped, and saved = rows in the table. Checked in a full run: 7,000 = 6,599 saved + 401 skipped, and 6,599 rows.
+- **A database script that is safe to re-run**, 73 unit tests written test-first, and a start script for RabbitMQ (`docker\RabbitMQ\docker-up.bat`) plus a start and a stop script for each of the monitoring and log parts (`docker-up.bat` and `docker-down.bat` in `docker\monitoring` and `docker\elk`).
+
+How to start and use the monitoring and log parts is described in "Bonus: monitoring, alerts and searchable logs" below.
+
 ## Setup
 
 Requirements: .NET 8 SDK, Docker (for RabbitMQ), SQL Server (local instance, Windows authentication).
@@ -52,8 +67,8 @@ Everything below is optional: the assessment runs without it. Each part has its 
 | Prometheus and Grafana | `docker\monitoring\docker-up.bat` | Grafana http://localhost:3000 (admin / admin, local only), Prometheus http://localhost:9090/targets |
 | Elasticsearch, Kibana, Filebeat | `docker\elk\docker-up.bat`, then once `docker\elk\kibana-setup.bat` | Kibana http://localhost:5601/app/discover |
 
-- **Metrics.** The API (`https://localhost:7120/metrics`) and the Consumer (`http://localhost:9101/metrics`) expose Prometheus metrics: process CPU, memory and garbage collection, requests per endpoint, and our own counters (`ot_api_bets_accepted_total`, `ot_api_publish_duration_seconds`, `ot_consumer_bets_saved_total`, `ot_consumer_batch_duration_seconds`, `ot_consumer_bets_dead_lettered_total`, and more). RabbitMQ's own Prometheus plugin adds queue depth per queue (including the dead-letter queue), connections and memory. The apps create their metrics at startup, so dashboards show 0 instead of "No data" before the first bet.
-- **Dashboard.** "OT Assessment - bets pipeline" in Grafana (16 panels): status of RabbitMQ, API and Consumer, queue depth, bets per second, time to queue and to save, CPU, memory, requests by status code, dead-lettered, requeued and retried messages. It is provisioned from files, so no clicking is needed.
+- **Metrics.** The API (`https://localhost:7120/metrics`) and the Consumer (`http://localhost:9101/metrics`) expose Prometheus metrics: process CPU, memory and garbage collection, requests per endpoint, and our own counters (`ot_api_bets_accepted_total`, `ot_api_publish_duration_seconds`, `ot_consumer_bets_saved_total`, `ot_consumer_bets_skipped_total`, `ot_consumer_batch_duration_seconds`, `ot_consumer_bets_dead_lettered_total`, and more). `bets_saved` counts rows really added to the table and `bets_skipped` counts repeated bets (a BetId that is already stored), so after a run: messages processed = saved + skipped, and saved equals the rows in `CasinoBet`. RabbitMQ's own Prometheus plugin adds queue depth per queue (including the dead-letter queue), connections and memory. The apps create their metrics at startup, so dashboards show 0 instead of "No data" before the first bet.
+- **Dashboard.** "OT Assessment - bets pipeline" in Grafana (17 panels): status of RabbitMQ, API and Consumer, queue depth, bets per second, time to queue and to save, CPU, memory, requests by status code, dead-lettered, requeued and retried messages. It is provisioned from files, so no clicking is needed.
 - **Alerts** (Grafana, evaluated every 30 seconds, shown in Grafana's alert list): dead-letter queue has messages; queue backlog above 5000 for 2 minutes; API, Consumer or RabbitMQ not reporting for 1 minute; the API could not queue bets; the Consumer is retrying database saves; queueing a bet slower than 10 seconds (p95) for 2 minutes; an app above 1.5 GB of memory for 5 minutes. I checked them by putting a test message into the dead-letter queue (the alert fired and cleared after I removed it) and by stopping the apps (the "down" alerts fired). No notification channel is configured, because email or chat needs real credentials that must not be committed.
 - **Logs in Kibana.** Filebeat reads the daily files in `src/OT.Assessment.App/logs` and `src/OT.Assessment.Consumer/logs` (info, warning and error folders), turns each line into time, level and text (a stack trace stays with its error line) and stores it in Elasticsearch as `ot-logs-<date>`. In Kibana the data view `ot-logs-*` can be searched by service (`service`), level (`log_level`: INF, WRN, ERR) and folder (`log_folder`). I checked that all 74 lines from my test runs arrived with the correct counts per service and level.
 - **Local-only choices (not for production):** security is off in Elasticsearch, Grafana uses admin / admin, Elasticsearch has a 512 MB heap, and Prometheus reaches the apps through `host.docker.internal` (the apps run on the host).
@@ -68,15 +83,25 @@ Everything below is optional: the assessment runs without it. Each part has its 
 
 ## Test results
 
-Provided Tester, one run on a freshly created database (7,000 requests, 500 every 2 seconds):
+Provided Tester, final run on a freshly created database, with the API, the Consumer, RabbitMQ and the monitoring stack running (7,000 requests, injected by the Tester at 500 every 2 seconds, which takes about 30 seconds):
 
-- Tester: 7,000 OK, 0 failed, about 30 s, about 233 requests per second.
-- RabbitMQ: queue fully drained, dead-letter queue empty.
-- Database: **6,772 bets stored**, 998 players, 979 games, 998 spend totals.
-- GET endpoints: checked after the run and **during** a second run. Every call returned 200; response time rose from about 25 ms to at most about 0.7 s under load and then recovered.
-- Unit tests: 51 passing (controller and message contract, written test-first).
+| Stage | Count |
+|---|---|
+| Tester: requests answered 200 / failed | 7,000 / 0 |
+| API: accepted / rejected / could not queue | 7,000 / 0 / 0 |
+| RabbitMQ: received / acknowledged | 7,000 / 7,000 |
+| Consumer: **saved as new rows** + **repeats skipped** | **6,599** + **401** = 7,000 |
+| Rows in `CasinoBet` | **6,599** (equals "saved") |
+| Players / games / spend totals | 997 / 979 / 997 |
+| Queue and dead-letter queue at the end | empty, nothing requeued, no retries |
 
-**Why 6,772 and not 7,000:** the Tester prepares 10,000 payloads with unique ids but sends `total[context.InvocationNumber]`, and under its load pattern some payloads are sent twice and others never. Logging every Consumer batch showed that the batches contained repeated BetIds, and that every distinct BetId was stored exactly once. The Consumer is idempotent by design, so the repeats are stored once. No acknowledged bet was lost. The Tester itself was not changed. Every Tester run creates new bet ids, so reset the database before a clean measurement.
+- **Latency:** the mean time for a request to complete was about 20 s in this run (min 0.2 s, max 30 s). Across the runs I did on one day it varied between about 20 s and 50 s, with the old code (before any logging or metrics) and the current code inside the same range, so the variation comes from machine load, not from the code. The "RPS = 233 / 250" figure in the Tester's summary is its injection schedule, not the speed of the API.
+- **CPU and memory at the peak of the load:** API about 98 percent of one core and 308 MB, Consumer about 24 percent and 90 MB, RabbitMQ about 16 percent and 194 MB. The API is the busy part.
+- **GET endpoints:** checked after the run and **during** an earlier run. Every call returned 200; response time rose from about 25 ms to at most about 0.7 s under load and then recovered.
+- **Unit tests:** 73 passing (controller, message contract, logging and metrics, written test-first).
+- **Alerts:** none fired during this run (the "slow publishing" rule needs 2 minutes above 10 s and the load lasted about 70 s); the dead-letter and "down" alerts were tested separately.
+
+**Why the table has fewer rows than the Tester sends:** the Tester prepares 10,000 payloads with unique ids but sends `total[context.InvocationNumber]`, and under its load pattern some payloads are sent twice and others never (the share differs from run to run: 217 and 401 repeats in two runs). The Consumer is idempotent by design, so a repeated BetId is stored once and counted as "skipped"; the dashboard and the Consumer log show both numbers, so saved + skipped always equals what the API accepted. No acknowledged bet was lost. The Tester itself was not changed. Every Tester run creates new bet ids, so reset the database before a clean measurement.
 
 ## How I tested, step by step
 
@@ -105,7 +130,7 @@ Provided Tester, one run on a freshly created database (7,000 requests, 500 ever
 5. Wait until the queue is empty: in the RabbitMQ management API (`/api/queues/%2F/casino-bets`) both `messages_ready` and `messages_unacknowledged` must be 0. Check that `casino-bets.dead` has 0 messages.
 6. Only then count the rows: `SELECT COUNT(*) FROM CasinoBet` (a count taken while the Consumer is still working is too low). Also count players, games and spend totals.
 
-**E. Finding where bets go missing (6,772 stored of 7,000 sent)**
+**E. Finding where bets go missing (an earlier run: 6,772 stored of 7,000 sent)**
 1. Checked the usual suspects: nothing in the dead-letter queue, no failed requests, the queue fully acknowledged.
 2. Ran a separate copy of the stack (own queues, own database, own API port) so my real data was not touched.
 3. Added a temporary log of every Consumer batch: messages in the batch, distinct BetIds in it, and rows the database actually gained.
@@ -132,7 +157,7 @@ Provided Tester, one run on a freshly created database (7,000 requests, 500 ever
 
 ## Known limits and production improvements
 
-- **Throughput of the publish path.** The API publishes one message at a time and waits for each confirm, so under 500 requests per second requests queue up and latency reaches about 30 s. For production: a pool of channels, or batched confirms, plus a bounded in-flight limit. I kept the simple version because it keeps "200 means safely queued" easy to reason about.
+- **Throughput of the publish path.** The API publishes one message at a time and waits for each confirm, so under the Tester's load requests queue up and the mean latency is between about 20 s and 50 s depending on how busy the machine is (the API reaches about 98 percent of one core). For production: a pool of channels, or batched confirms, plus a bounded in-flight limit. I kept the simple version because it keeps "200 means safely queued" easy to reason about.
 - **Validation:** add length limits on text fields (database column sizes) and return 400 with details.
 - **Operations:** health checks (API, RabbitMQ, database), correlation ids in the logs, central log collection (instead of local files) with retention and clean-up of old files, metrics and alerts (queue depth, dead-letter count), rate limiting.
 - **Security:** no default `guest` credentials, secrets from a vault or environment variables, TLS to RabbitMQ and SQL Server with a trusted certificate, authentication on the API.
