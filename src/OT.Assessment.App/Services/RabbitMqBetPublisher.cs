@@ -12,6 +12,7 @@ namespace OT.Assessment.App.Services
     public class RabbitMqBetPublisher : IBetPublisher, IAsyncDisposable
     {
         private readonly RabbitMqSettings _settings;
+        private readonly ILogger<RabbitMqBetPublisher> _logger;
         private IConnection _connection;
         private IChannel _channel;
         private readonly SemaphoreSlim _connectLock = new(1, 1);
@@ -19,9 +20,10 @@ namespace OT.Assessment.App.Services
 
 
 
-        public RabbitMqBetPublisher(IOptions<RabbitMqSettings> options)
+        public RabbitMqBetPublisher(IOptions<RabbitMqSettings> options, ILogger<RabbitMqBetPublisher> logger)
         {
             _settings = options.Value;
+            _logger = logger;
         }
 
         public async Task PublishAsync(
@@ -102,6 +104,12 @@ namespace OT.Assessment.App.Services
 
                 if (_connection == null || !_connection.IsOpen)
                 {
+                    if (_connection != null)
+                    {
+                        _logger.LogWarning("The RabbitMQ connection was lost; reconnecting to {Host}:{Port}",
+                            _settings.HostName, _settings.Port);
+                    }
+
                     var factory = new ConnectionFactory
                     {
                         HostName = _settings.HostName,
@@ -122,6 +130,14 @@ namespace OT.Assessment.App.Services
 
 
                 await DeclareQueuesAsync(cancellationToken);
+
+                _logger.LogInformation("Connected to RabbitMQ at {Host}:{Port}, queue {Queue} is ready",
+                    _settings.HostName, _settings.Port, _settings.QueueName);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Could not connect to RabbitMQ at {Host}:{Port}", _settings.HostName, _settings.Port);
+                throw;
             }
             finally
             {
@@ -165,6 +181,8 @@ namespace OT.Assessment.App.Services
             {
                 await _connection.DisposeAsync();
             }
+
+            _logger.LogInformation("RabbitMQ publisher closed");
         }
     }
 }

@@ -5,6 +5,7 @@ using OT.Assessment.Common.Settings;
 using OT.Assessment.Consumer.Settings;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using System.Diagnostics;
 using System.Text.Json;
 using System.Threading.Channels;
 
@@ -51,6 +52,8 @@ namespace OT.Assessment.Consumer.Services
 
         public override async Task StopAsync(CancellationToken cancellationToken)
         {
+            _logger.LogInformation("Consumer stopping; {Waiting} bets still waiting in memory", _buffer.Reader.Count);
+
             await base.StopAsync(cancellationToken);
 
             if (_channel != null)
@@ -135,6 +138,10 @@ namespace OT.Assessment.Consumer.Services
 
             await _channel.BasicConsumeAsync(_rabbit.QueueName, autoAck: false, consumer: consumer,
                 cancellationToken: stoppingToken);
+
+            _logger.LogInformation(
+                "Consuming queue {Queue}: batch size {BatchSize}, flush every {FlushMs} ms, prefetch {Prefetch}",
+                _rabbit.QueueName, _settings.BatchSize, _settings.FlushIntervalMs, _settings.PrefetchCount);
         }
 
         private async Task RunBatchLoopAsync(CancellationToken stoppingToken)
@@ -180,6 +187,7 @@ namespace OT.Assessment.Consumer.Services
             }
 
             var lastTag = batch[^1].DeliveryTag;
+            var timer = Stopwatch.StartNew();
 
             try
             {
@@ -187,7 +195,8 @@ namespace OT.Assessment.Consumer.Services
 
                 // All earlier delivery tags are already settled, so one multiple-ack covers the batch.
                 await _channel.BasicAckAsync(lastTag, true, cancellationToken);
-                _logger.LogInformation("Saved {Count} bets", batch.Count);
+                _logger.LogInformation("Saved {Count} bets in {ElapsedMs} ms ({Waiting} more waiting in memory)",
+                    batch.Count, timer.ElapsedMilliseconds, _buffer.Reader.Count);
             }
             catch (Exception ex) when (ex is not OperationCanceledException && IsDataError(ex))
             {
