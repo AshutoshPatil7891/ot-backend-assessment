@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OT.Assessment.App.Controllers;
 using OT.Assessment.Common.msg;
@@ -8,9 +9,10 @@ namespace OT.Assessment.UnitTests
     /// <summary>Small helpers shared by the tests.</summary>
     public static class TestData
     {
-        public static PlayerController CreateController(FakeBetPublisher publisher, FakePlayerReader reader)
+        public static PlayerController CreateController(
+            FakeBetPublisher publisher, FakePlayerReader reader, ILogger<PlayerController> logger = null)
         {
-            return new PlayerController(publisher, reader, NullLogger<PlayerController>.Instance);
+            return new PlayerController(publisher, reader, logger ?? NullLogger<PlayerController>.Instance);
         }
 
         public static CasinoBetMesg ValidBet()

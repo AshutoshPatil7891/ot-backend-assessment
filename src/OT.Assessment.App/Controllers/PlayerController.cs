@@ -33,20 +33,18 @@ namespace OT.Assessment.App.Controllers
             CasinoBetMesg bet,
             CancellationToken cancellationToken)
         {
-            if (bet.BetId == Guid.Empty ||
-                bet.AccountId == Guid.Empty ||
-                bet.CreatedDateTime == default ||
-                string.IsNullOrWhiteSpace(bet.Username) ||
-                string.IsNullOrWhiteSpace(bet.GameName) ||
-                string.IsNullOrWhiteSpace(bet.Provider) ||
-                bet.Amount <= 0)
+            var invalidFields = InvalidFields(bet);
+            if (invalidFields.Count > 0)
             {
+                _logger.LogWarning("Bet {BetId} for player {AccountId} rejected, invalid fields: {Fields}",
+                    bet.BetId, bet.AccountId, string.Join(", ", invalidFields));
                 return BadRequest("Bet is missing required fields.");
             }
 
             try
             {
                 await _publisher.PublishAsync(bet, cancellationToken);
+                _logger.LogInformation("Bet {BetId} for player {AccountId} accepted and queued", bet.BetId, bet.AccountId);
                 return Ok();
             }
             catch (OperationCanceledException)
@@ -55,9 +53,23 @@ namespace OT.Assessment.App.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to publish bet.");
+                _logger.LogError(ex, "Failed to publish bet {BetId}", bet.BetId);
                 return StatusCode(503);
             }
+        }
+
+        // names of the required fields that are missing or invalid (empty list = the bet is valid)
+        private static List<string> InvalidFields(CasinoBetMesg bet)
+        {
+            var invalid = new List<string>();
+            if (bet.BetId == Guid.Empty) invalid.Add("BetId");
+            if (bet.AccountId == Guid.Empty) invalid.Add("AccountId");
+            if (bet.CreatedDateTime == default) invalid.Add("CreatedDateTime");
+            if (string.IsNullOrWhiteSpace(bet.Username)) invalid.Add("Username");
+            if (string.IsNullOrWhiteSpace(bet.GameName)) invalid.Add("GameName");
+            if (string.IsNullOrWhiteSpace(bet.Provider)) invalid.Add("Provider");
+            if (bet.Amount <= 0) invalid.Add("Amount");
+            return invalid;
         }
 
 
@@ -77,11 +89,16 @@ namespace OT.Assessment.App.Controllers
         {
             if (page < 1 || pageSize < 1 || pageSize > 100)
             {
+                _logger.LogWarning("Invalid paging for player {PlayerId}: page {Page}, pageSize {PageSize}",
+                    playerId, page, pageSize);
                 return BadRequest("Invalid page or pageSize.");
             }
 
             var result = await _reader.GetPlayerBetsAsync(
                 playerId, page, pageSize, cancellationToken);
+
+            _logger.LogInformation("Player {PlayerId} bets: page {Page}, pageSize {PageSize}, returned {Count} of {Total}",
+                playerId, page, pageSize, result.Data.Count, result.Total);
 
             return Ok(result);
         }
@@ -98,10 +115,13 @@ namespace OT.Assessment.App.Controllers
         {
             if (count < 1 || count > 100)
             {
+                _logger.LogWarning("Invalid top spenders count {Count}", count);
                 return BadRequest("Count must be between 1 and 100.");
             }
 
             var result = await _reader.GetTopSpendersAsync(count, cancellationToken);
+
+            _logger.LogInformation("Top spenders: count {Count}, returned {Returned}", count, result.Count);
 
             return Ok(result);
         }
