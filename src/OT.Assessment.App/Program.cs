@@ -1,10 +1,17 @@
 using System.Reflection;
 using OT.Assessment.App.Services;
+using OT.Assessment.Common.Logging;
 using OT.Assessment.Common.Settings;
+using Serilog;
 
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+// console + daily log files in <project folder>/logs/info, warning and error
+Log.Logger = FileLogging.Configure(new LoggerConfiguration(), Path.Combine(Directory.GetCurrentDirectory(), "logs")).CreateLogger();
+builder.Host.UseSerilog();
+
 builder.Services.AddControllers();
 
 builder.Services.Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"));

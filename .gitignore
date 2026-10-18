@@ -362,3 +362,6 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 reports/
+
+# Log files (written when the API and the Consumer run)
+logs/

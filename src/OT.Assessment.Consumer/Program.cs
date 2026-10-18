@@ -1,10 +1,16 @@
 ﻿using Microsoft.Extensions.Configuration;
+using OT.Assessment.Common.Logging;
 using OT.Assessment.Common.Settings;
 using OT.Assessment.Consumer.Services;
 using OT.Assessment.Consumer.Settings;
+using Serilog;
 
+
+// console + daily log files in <project folder>/logs/info, warning and error
+Log.Logger = FileLogging.Configure(new LoggerConfiguration(), Path.Combine(Directory.GetCurrentDirectory(), "logs")).CreateLogger();
 
 var host = Host.CreateDefaultBuilder(args)
+    .UseSerilog()
 
     .ConfigureAppConfiguration(config =>
     {
