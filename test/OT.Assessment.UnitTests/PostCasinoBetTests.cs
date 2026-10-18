@@ -5,6 +5,7 @@ using OT.Assessment.UnitTests.Fakes;
 namespace OT.Assessment.UnitTests
 {
     /// <summary>Tests for POST api/player/casinowager (PlayerController.PostCasinoBet).</summary>
+    [Collection(PostEndpointCollection.Name)]
     public class PostCasinoBetTests
     {
         private readonly FakeBetPublisher _publisher = new FakeBetPublisher();

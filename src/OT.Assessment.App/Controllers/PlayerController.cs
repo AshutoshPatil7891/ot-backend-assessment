@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using OT.Assessment.App.Monitoring;
 using OT.Assessment.App.Services;
 using OT.Assessment.Common.msg;
 using OT.Assessment.Common.Resp;
+using Prometheus;
 
 namespace OT.Assessment.App.Controllers
 {
@@ -38,13 +40,18 @@ namespace OT.Assessment.App.Controllers
             {
                 _logger.LogWarning("Bet {BetId} for player {AccountId} rejected, invalid fields: {Fields}",
                     bet.BetId, bet.AccountId, string.Join(", ", invalidFields));
+                ApiMetrics.BetsRejected.Inc();
                 return BadRequest("Bet is missing required fields.");
             }
 
             try
             {
-                await _publisher.PublishAsync(bet, cancellationToken);
+                using (ApiMetrics.PublishDuration.NewTimer())
+                {
+                    await _publisher.PublishAsync(bet, cancellationToken);
+                }
                 _logger.LogInformation("Bet {BetId} for player {AccountId} accepted and queued", bet.BetId, bet.AccountId);
+                ApiMetrics.BetsAccepted.Inc();
                 return Ok();
             }
             catch (OperationCanceledException)
@@ -54,6 +61,7 @@ namespace OT.Assessment.App.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to publish bet {BetId}", bet.BetId);
+                ApiMetrics.BetsPublishFailed.Inc();
                 return StatusCode(503);
             }
         }

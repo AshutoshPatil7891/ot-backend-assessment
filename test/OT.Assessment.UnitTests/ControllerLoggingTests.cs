@@ -8,6 +8,7 @@ namespace OT.Assessment.UnitTests
     /// Tests that every endpoint writes the log lines needed to find a problem later:
     /// information for requests that worked, warnings for rejected input, errors for failures.
     /// </summary>
+    [Collection(PostEndpointCollection.Name)]
     public class ControllerLoggingTests
     {
         private readonly FakeBetPublisher _publisher = new FakeBetPublisher();

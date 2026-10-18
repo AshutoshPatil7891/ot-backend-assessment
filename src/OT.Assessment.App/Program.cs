@@ -1,7 +1,9 @@
 using System.Reflection;
+using OT.Assessment.App.Monitoring;
 using OT.Assessment.App.Services;
 using OT.Assessment.Common.Logging;
 using OT.Assessment.Common.Settings;
+using Prometheus;
 using Serilog;
 
 
@@ -49,6 +51,11 @@ app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
+// request counts and durations per endpoint, and the /metrics page that Prometheus reads
+ApiMetrics.Initialise();
+app.UseHttpMetrics();
+
 app.MapControllers();
+app.MapMetrics();
 
 app.Run();

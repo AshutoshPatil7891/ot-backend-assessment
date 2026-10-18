@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Options;
 using OT.Assessment.Common.msg;
 using OT.Assessment.Common.Settings;
+using OT.Assessment.Consumer.Monitoring;
 using OT.Assessment.Consumer.Settings;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
@@ -128,10 +129,12 @@ namespace OT.Assessment.Consumer.Services
                     }
 
                     await _buffer.Writer.WriteAsync(new PendingBet(ea.DeliveryTag, bet), stoppingToken);
+                    ConsumerMetrics.BufferedBets.Set(_buffer.Reader.Count);
                 }
                 catch (JsonException ex)
                 {
                     _logger.LogError(ex, "Message {Tag} is not a valid bet; sending it to the dead-letter queue", ea.DeliveryTag);
+                    ConsumerMetrics.DeadLettered.Inc();
                     await _channel.BasicNackAsync(ea.DeliveryTag, false, false, stoppingToken);
                 }
             };
@@ -197,6 +200,10 @@ namespace OT.Assessment.Consumer.Services
                 await _channel.BasicAckAsync(lastTag, true, cancellationToken);
                 _logger.LogInformation("Saved {Count} bets in {ElapsedMs} ms ({Waiting} more waiting in memory)",
                     batch.Count, timer.ElapsedMilliseconds, _buffer.Reader.Count);
+                ConsumerMetrics.BetsSaved.Inc(batch.Count);
+                ConsumerMetrics.Batches.Inc();
+                ConsumerMetrics.BatchDuration.Observe(timer.Elapsed.TotalSeconds);
+                ConsumerMetrics.BufferedBets.Set(_buffer.Reader.Count);
             }
             catch (Exception ex) when (ex is not OperationCanceledException && IsDataError(ex))
             {
@@ -206,6 +213,7 @@ namespace OT.Assessment.Consumer.Services
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 _logger.LogError(ex, "Could not save {Count} bets; returning them to the queue", batch.Count);
+                ConsumerMetrics.Requeued.Inc(batch.Count);
                 await _channel.BasicNackAsync(lastTag, true, true, cancellationToken);
             }
         }
@@ -224,6 +232,7 @@ namespace OT.Assessment.Consumer.Services
                                            && attempt < _settings.MaxRetries)
                 {
                     _logger.LogWarning(ex, "Saving failed (attempt {Attempt} of {Max}); trying again", attempt, _settings.MaxRetries);
+                    ConsumerMetrics.SaveRetries.Inc();
                     await Task.Delay(_settings.RetryDelayMs * attempt, cancellationToken);
                 }
             }
@@ -237,15 +246,18 @@ namespace OT.Assessment.Consumer.Services
                 {
                     await _writer.WriteBatchAsync(new[] { item.Bet }, cancellationToken);
                     await _channel.BasicAckAsync(item.DeliveryTag, false, cancellationToken);
+                    ConsumerMetrics.BetsSaved.Inc();
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException && IsDataError(ex))
                 {
                     _logger.LogError(ex, "Bet {BetId} cannot be saved; sending it to the dead-letter queue", item.Bet.BetId);
+                    ConsumerMetrics.DeadLettered.Inc();
                     await _channel.BasicNackAsync(item.DeliveryTag, false, false, cancellationToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     _logger.LogError(ex, "Bet {BetId} could not be saved right now; returning it to the queue", item.Bet.BetId);
+                    ConsumerMetrics.Requeued.Inc();
                     await _channel.BasicNackAsync(item.DeliveryTag, false, true, cancellationToken);
                 }
             }

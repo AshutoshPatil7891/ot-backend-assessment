@@ -26,5 +26,18 @@
             <param name="count">How many players to return, from 1 to 100 (default 10).</param>
             <param name="cancellationToken">Cancelled if the client disconnects.</param>
         </member>
+        <member name="T:OT.Assessment.App.Monitoring.ApiMetrics">
+            <summary>
+            The numbers the API shows on its /metrics page (read by Prometheus, drawn by Grafana).
+            Process CPU, memory and request metrics come from prometheus-net on their own.
+            </summary>
+        </member>
+        <member name="M:OT.Assessment.App.Monitoring.ApiMetrics.Initialise">
+            <summary>
+            Call once at startup. .NET creates the metrics below the first time this class is used,
+            so without this they would be missing from /metrics until the first bet arrives
+            (Grafana would show "No data" instead of 0).
+            </summary>
+        </member>
     </members>
 </doc>
