@@ -35,6 +35,21 @@ namespace OT.Assessment.UnitTests
         }
 
         [Fact]
+        public async Task ValidBet_KeepsTheBetIdAndTheCreatedTimeFromThePayload()
+        {
+            var controller = TestData.CreateController(_publisher, _reader);
+            var bet = TestData.ValidBet();
+            var idFromPayload = bet.BetId;
+            var timeFromPayload = bet.CreatedDateTime;
+
+            await controller.PostCasinoBet(bet, CancellationToken.None);
+
+            var published = Assert.Single(_publisher.Published);
+            Assert.Equal(idFromPayload, published.BetId);
+            Assert.Equal(timeFromPayload, published.CreatedDateTime);
+        }
+
+        [Fact]
         public async Task BetWithoutCountryCodeAndTheme_ReturnsOk()
         {
             var controller = TestData.CreateController(_publisher, _reader);
@@ -63,6 +78,8 @@ namespace OT.Assessment.UnitTests
         // ---------- negative scenarios ----------
 
         [Theory]
+        [InlineData("EmptyBetId")]
+        [InlineData("MissingCreatedDateTime")]
         [InlineData("EmptyAccountId")]
         [InlineData("NullUsername")]
         [InlineData("BlankUsername")]
@@ -110,6 +127,8 @@ namespace OT.Assessment.UnitTests
         {
             switch (problem)
             {
+                case "EmptyBetId": bet.BetId = Guid.Empty; break;
+                case "MissingCreatedDateTime": bet.CreatedDateTime = default; break;
                 case "EmptyAccountId": bet.AccountId = Guid.Empty; break;
                 case "NullUsername": bet.Username = null; break;
                 case "BlankUsername": bet.Username = "   "; break;

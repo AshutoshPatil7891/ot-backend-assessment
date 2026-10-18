@@ -10,5 +10,21 @@
             Connects on first use and reuses the same connection afterwards.
             </summary>
         </member>
+        <member name="M:OT.Assessment.App.Controllers.PlayerController.GetPlayerBets(System.Guid,System.Threading.CancellationToken,System.Int32,System.Int32)">
+            <summary>
+            Returns one page of a player's latest casino bets, newest first.
+            </summary>
+            <param name="playerId">The player's account id (a GUID).</param>
+            <param name="page">The page number, starting at 1 (default 1).</param>
+            <param name="pageSize">How many bets per page, from 1 to 100 (default 10).</param>
+            <param name="cancellationToken">Cancelled if the client disconnects.</param>
+        </member>
+        <member name="M:OT.Assessment.App.Controllers.PlayerController.GetTopSpenders(System.Threading.CancellationToken,System.Int32)">
+            <summary>
+            Returns the top players by total amount spent across all games, highest first.
+            </summary>
+            <param name="count">How many players to return, from 1 to 100 (default 10).</param>
+            <param name="cancellationToken">Cancelled if the client disconnects.</param>
+        </member>
     </members>
 </doc>

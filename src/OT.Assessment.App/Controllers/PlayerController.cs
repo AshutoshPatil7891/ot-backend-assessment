@@ -28,15 +28,14 @@ namespace OT.Assessment.App.Controllers
         /// Sends one bet data to the RabbitMQ queue and waits until RabbitMQ confirms it has received it.
         /// Connects on first use and reuses the same connection afterwards.
         /// </summary>
-
-
-
         [HttpPost("casinowager")]
         public async Task<IActionResult> PostCasinoBet(
             CasinoBetMesg bet,
             CancellationToken cancellationToken)
         {
-            if (bet.AccountId == Guid.Empty ||
+            if (bet.BetId == Guid.Empty ||
+                bet.AccountId == Guid.Empty ||
+                bet.CreatedDateTime == default ||
                 string.IsNullOrWhiteSpace(bet.Username) ||
                 string.IsNullOrWhiteSpace(bet.GameName) ||
                 string.IsNullOrWhiteSpace(bet.Provider) ||
@@ -44,9 +43,6 @@ namespace OT.Assessment.App.Controllers
             {
                 return BadRequest("Bet is missing required fields.");
             }
-
-
-            bet.CreatedDateTime = DateTimeOffset.UtcNow;
 
             try
             {
@@ -65,6 +61,13 @@ namespace OT.Assessment.App.Controllers
         }
 
 
+        /// <summary>
+        /// Returns one page of a player's latest casino bets, newest first.
+        /// </summary>
+        /// <param name="playerId">The player's account id (a GUID).</param>
+        /// <param name="page">The page number, starting at 1 (default 1).</param>
+        /// <param name="pageSize">How many bets per page, from 1 to 100 (default 10).</param>
+        /// <param name="cancellationToken">Cancelled if the client disconnects.</param>
         [HttpGet("{playerId:guid}/casino")]
         public async Task<ActionResult<PagedResp<PlayerBetResp>>> GetPlayerBets(
             Guid playerId,
@@ -83,6 +86,11 @@ namespace OT.Assessment.App.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Returns the top players by total amount spent across all games, highest first.
+        /// </summary>
+        /// <param name="count">How many players to return, from 1 to 100 (default 10).</param>
+        /// <param name="cancellationToken">Cancelled if the client disconnects.</param>
         [HttpGet("topSpenders")]
         public async Task<ActionResult<List<TopSpenderResp>>> GetTopSpenders(
             CancellationToken cancellationToken,
