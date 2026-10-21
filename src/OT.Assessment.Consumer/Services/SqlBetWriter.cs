@@ -2,7 +2,7 @@
 using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using OT.Assessment.Common.msg;
+using OT.Assessment.Common.Messages;
 using System.Data;
 
 namespace OT.Assessment.Consumer.Services
@@ -17,7 +17,7 @@ namespace OT.Assessment.Consumer.Services
         }
 
         public async Task<int> WriteBatchAsync(
-            IReadOnlyList<CasinoBetMesg> bets,
+            IReadOnlyList<CasinoBetMessage> bets,
             CancellationToken cancellationToken = default)
         {
             var table = BuildTable(bets);
@@ -36,7 +36,7 @@ namespace OT.Assessment.Consumer.Services
             return await connection.QuerySingleAsync<int>(command);
         }
 
-        private static DataTable BuildTable(IReadOnlyList<CasinoBetMesg> bets)
+        private static DataTable BuildTable(IReadOnlyList<CasinoBetMessage> bets)
         {
             var table = new DataTable();
 

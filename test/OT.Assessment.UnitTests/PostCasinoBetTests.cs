@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using OT.Assessment.Common.msg;
+using OT.Assessment.Common.Messages;
 using OT.Assessment.UnitTests.Fakes;
 
 namespace OT.Assessment.UnitTests
@@ -124,7 +124,7 @@ namespace OT.Assessment.UnitTests
                 () => controller.PostCasinoBet(TestData.ValidBet(), CancellationToken.None));
         }
 
-        private static void Break(CasinoBetMesg bet, string problem)
+        private static void Break(CasinoBetMessage bet, string problem)
         {
             switch (problem)
             {

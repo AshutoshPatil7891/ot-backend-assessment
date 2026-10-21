@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\OT.Assessment.App\OT.Assessment.App.csproj" />
     <ProjectReference Include="..\..\src\OT.Assessment.Common\OT.Assessment.Common.csproj" />
+    <ProjectReference Include="..\..\src\OT.Assessment.Consumer\OT.Assessment.Consumer.csproj" />
   </ItemGroup>
 
 </Project>

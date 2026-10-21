@@ -1,6 +1,5 @@
-﻿using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Options;
-using OT.Assessment.Common.msg;
+﻿using Microsoft.Extensions.Options;
+using OT.Assessment.Common.Messages;
 using OT.Assessment.Common.Settings;
 using OT.Assessment.Consumer.Monitoring;
 using OT.Assessment.Consumer.Settings;
@@ -19,10 +18,6 @@ namespace OT.Assessment.Consumer.Services
     /// </summary>
     public class BetConsumerService : BackgroundService
     {
-        // SQL Server error numbers that mean "this data cannot be stored" (retrying will not help).
-        private static readonly int[] DataErrorNumbers =
-            { 220, 232, 242, 245, 515, 547, 2601, 2627, 2628, 8114, 8115, 8152 };
-
         private readonly RabbitMqSettings _rabbit;
         private readonly ConsumerSettings _settings;
         private readonly IBetWriter _writer;
@@ -121,7 +116,7 @@ namespace OT.Assessment.Consumer.Services
             {
                 try
                 {
-                    var bet = JsonSerializer.Deserialize<CasinoBetMesg>(ea.Body.Span);
+                    var bet = JsonSerializer.Deserialize<CasinoBetMessage>(ea.Body.Span);
 
                     if (bet == null)
                     {
@@ -208,7 +203,7 @@ namespace OT.Assessment.Consumer.Services
                 ConsumerMetrics.BatchDuration.Observe(timer.Elapsed.TotalSeconds);
                 ConsumerMetrics.BufferedBets.Set(_buffer.Reader.Count);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException && IsDataError(ex))
+            catch (Exception ex) when (ex is not OperationCanceledException && SqlErrorClassifier.IsDataError(ex))
             {
                 _logger.LogWarning(ex, "The database rejected a batch of {Count} bets; saving them one by one", batch.Count);
                 await FlushOneByOneAsync(batch, cancellationToken);
@@ -221,7 +216,7 @@ namespace OT.Assessment.Consumer.Services
             }
         }
 
-        private async Task<int> WriteWithRetryAsync(IReadOnlyList<CasinoBetMesg> bets, CancellationToken cancellationToken)
+        private async Task<int> WriteWithRetryAsync(IReadOnlyList<CasinoBetMessage> bets, CancellationToken cancellationToken)
         {
             for (var attempt = 1; ; attempt++)
             {
@@ -230,7 +225,7 @@ namespace OT.Assessment.Consumer.Services
                     return await _writer.WriteBatchAsync(bets, cancellationToken);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException
-                                           && !IsDataError(ex)
+                                           && !SqlErrorClassifier.IsDataError(ex)
                                            && attempt < _settings.MaxRetries)
                 {
                     _logger.LogWarning(ex, "Saving failed (attempt {Attempt} of {Max}); trying again", attempt, _settings.MaxRetries);
@@ -251,7 +246,7 @@ namespace OT.Assessment.Consumer.Services
                     ConsumerMetrics.BetsSaved.Inc(inserted);
                     ConsumerMetrics.BetsSkipped.Inc(1 - inserted);
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException && IsDataError(ex))
+                catch (Exception ex) when (ex is not OperationCanceledException && SqlErrorClassifier.IsDataError(ex))
                 {
                     _logger.LogError(ex, "Bet {BetId} cannot be saved; sending it to the dead-letter queue", item.Bet.BetId);
                     ConsumerMetrics.DeadLettered.Inc();
@@ -266,16 +261,6 @@ namespace OT.Assessment.Consumer.Services
             }
         }
 
-        private static bool IsDataError(Exception ex)
-        {
-            return ex switch
-            {
-                SqlException sql => sql.Errors.Cast<SqlError>().Any(e => DataErrorNumbers.Contains(e.Number)),
-                ArgumentException or InvalidCastException or FormatException or OverflowException => true,
-                _ => false
-            };
-        }
-
-        private record PendingBet(ulong DeliveryTag, CasinoBetMesg Bet);
+        private record PendingBet(ulong DeliveryTag, CasinoBetMessage Bet);
     }
 }

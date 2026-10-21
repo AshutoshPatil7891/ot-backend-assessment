@@ -1,7 +1,7 @@
 ﻿
-namespace OT.Assessment.Common.Resp
+namespace OT.Assessment.Common.Responses
 {
-    public class TopSpenderResp
+    public class TopSpenderResponse
     {
         public Guid AccountId { get; set; }
         public string Username { get; set; }

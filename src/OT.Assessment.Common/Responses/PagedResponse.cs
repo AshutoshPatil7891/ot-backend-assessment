@@ -1,7 +1,7 @@
 ﻿
-namespace OT.Assessment.Common.Resp
+namespace OT.Assessment.Common.Responses
 {
-    public class PagedResp<T>
+    public class PagedResponse<T>
     {
         public List<T> Data { get; set; } = new();
         public int Page { get; set; }

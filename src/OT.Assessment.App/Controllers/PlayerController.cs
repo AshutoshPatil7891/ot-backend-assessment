@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using OT.Assessment.App.Monitoring;
 using OT.Assessment.App.Services;
-using OT.Assessment.Common.msg;
-using OT.Assessment.Common.Resp;
+using OT.Assessment.Common.Messages;
+using OT.Assessment.Common.Responses;
 using Prometheus;
 
 namespace OT.Assessment.App.Controllers
@@ -32,7 +32,7 @@ namespace OT.Assessment.App.Controllers
         /// </summary>
         [HttpPost("casinowager")]
         public async Task<IActionResult> PostCasinoBet(
-            CasinoBetMesg bet,
+            CasinoBetMessage bet,
             CancellationToken cancellationToken)
         {
             var invalidFields = InvalidFields(bet);
@@ -67,7 +67,7 @@ namespace OT.Assessment.App.Controllers
         }
 
         // names of the required fields that are missing or invalid (empty list = the bet is valid)
-        private static List<string> InvalidFields(CasinoBetMesg bet)
+        private static List<string> InvalidFields(CasinoBetMessage bet)
         {
             var invalid = new List<string>();
             if (bet.BetId == Guid.Empty) invalid.Add("BetId");
@@ -89,7 +89,7 @@ namespace OT.Assessment.App.Controllers
         /// <param name="pageSize">How many bets per page, from 1 to 100 (default 10).</param>
         /// <param name="cancellationToken">Cancelled if the client disconnects.</param>
         [HttpGet("{playerId:guid}/casino")]
-        public async Task<ActionResult<PagedResp<PlayerBetResp>>> GetPlayerBets(
+        public async Task<ActionResult<PagedResponse<PlayerBetResponse>>> GetPlayerBets(
             Guid playerId,
             CancellationToken cancellationToken,
             [FromQuery] int page = 1,
@@ -117,7 +117,7 @@ namespace OT.Assessment.App.Controllers
         /// <param name="count">How many players to return, from 1 to 100 (default 10).</param>
         /// <param name="cancellationToken">Cancelled if the client disconnects.</param>
         [HttpGet("topSpenders")]
-        public async Task<ActionResult<List<TopSpenderResp>>> GetTopSpenders(
+        public async Task<ActionResult<List<TopSpenderResponse>>> GetTopSpenders(
             CancellationToken cancellationToken,
             [FromQuery] int count = 10)
         {

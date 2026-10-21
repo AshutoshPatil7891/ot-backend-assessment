@@ -1,5 +1,5 @@
 ﻿using Microsoft.Extensions.Options;
-using OT.Assessment.Common.msg;
+using OT.Assessment.Common.Messages;
 using OT.Assessment.Common.Settings;
 using RabbitMQ.Client;
 using System.Runtime;
@@ -14,9 +14,12 @@ namespace OT.Assessment.App.Services
         private readonly RabbitMqSettings _settings;
         private readonly ILogger<RabbitMqBetPublisher> _logger;
         private IConnection _connection;
-        private IChannel _channel;
+        // several channels, each with its own lock: one channel sends one bet at a time (it waits for the broker's
+        // confirm), so more channels means more bets in flight at once
+        private IChannel[] _channels;
+        private readonly SemaphoreSlim[] _channelLocks;
+        private int _nextChannel;
         private readonly SemaphoreSlim _connectLock = new(1, 1);
-        private readonly SemaphoreSlim _publishLock = new(1, 1);
 
 
 
@@ -24,10 +27,13 @@ namespace OT.Assessment.App.Services
         {
             _settings = options.Value;
             _logger = logger;
+            _channelLocks = Enumerable.Range(0, Math.Max(1, _settings.PublishChannels))
+                .Select(_ => new SemaphoreSlim(1, 1))
+                .ToArray();
         }
 
         public async Task PublishAsync(
-    CasinoBetMesg bet,
+    CasinoBetMessage bet,
     CancellationToken cancellationToken = default)
         {
             await ConnectAsync(cancellationToken);
@@ -40,10 +46,14 @@ namespace OT.Assessment.App.Services
                 ContentType = "application/json"
             };
 
-            await _publishLock.WaitAsync(cancellationToken);
+            // the array is replaced as a whole when the connection is rebuilt, so take one copy
+            var channels = _channels;
+            var slot = PublishSlot.Next(ref _nextChannel, channels.Length);
+
+            await _channelLocks[slot].WaitAsync(cancellationToken);
             try
             {
-                await _channel.BasicPublishAsync(
+                await channels[slot].BasicPublishAsync(
                     exchange: string.Empty,
                     routingKey: _settings.QueueName,
                     mandatory: false,
@@ -53,7 +63,7 @@ namespace OT.Assessment.App.Services
             }
             finally
             {
-                _publishLock.Release();
+                _channelLocks[slot].Release();
             }
         }
 
@@ -87,8 +97,7 @@ namespace OT.Assessment.App.Services
 
         private async Task ConnectAsync(CancellationToken cancellationToken)
         {
-            if (_connection != null && _connection.IsOpen &&
-                _channel != null && _channel.IsOpen)
+            if (IsReady)
             {
                 return;
             }
@@ -96,8 +105,7 @@ namespace OT.Assessment.App.Services
             await _connectLock.WaitAsync(cancellationToken);
             try
             {
-                if (_connection != null && _connection.IsOpen &&
-                    _channel != null && _channel.IsOpen)
+                if (IsReady)
                 {
                     return;
                 }
@@ -125,14 +133,21 @@ namespace OT.Assessment.App.Services
                 var channelOptions = new CreateChannelOptions(
                     publisherConfirmationsEnabled: true,
                     publisherConfirmationTrackingEnabled: true);
-                _channel = await _connection.CreateChannelAsync(channelOptions, cancellationToken);
+                var channels = new IChannel[_channelLocks.Length];
+                for (var i = 0; i < channels.Length; i++)
+                {
+                    channels[i] = await _connection.CreateChannelAsync(channelOptions, cancellationToken);
+                }
 
+                // the queues are declared before any request can use the channels
+                await DeclareQueuesAsync(channels[0], cancellationToken);
 
+                var oldChannels = _channels;
+                _channels = channels;
+                await CloseAsync(oldChannels);
 
-                await DeclareQueuesAsync(cancellationToken);
-
-                _logger.LogInformation("Connected to RabbitMQ at {Host}:{Port}, queue {Queue} is ready",
-                    _settings.HostName, _settings.Port, _settings.QueueName);
+                _logger.LogInformation("Connected to RabbitMQ at {Host}:{Port}, queue {Queue} is ready ({Channels} publish channels)",
+                    _settings.HostName, _settings.Port, _settings.QueueName, channels.Length);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -145,9 +160,12 @@ namespace OT.Assessment.App.Services
             }
         }
 
-        private async Task DeclareQueuesAsync(CancellationToken cancellationToken)
+        private bool IsReady => _connection != null && _connection.IsOpen &&
+                                _channels != null && _channels.All(channel => channel.IsOpen);
+
+        private async Task DeclareQueuesAsync(IChannel channel, CancellationToken cancellationToken)
         {
-            await _channel.QueueDeclareAsync(
+            await channel.QueueDeclareAsync(
                 queue: _settings.DeadLetterQueueName,
                 durable: true,
                 exclusive: false,
@@ -161,7 +179,7 @@ namespace OT.Assessment.App.Services
                 ["x-dead-letter-routing-key"] = _settings.DeadLetterQueueName
             };
 
-            await _channel.QueueDeclareAsync(
+            await channel.QueueDeclareAsync(
                 queue: _settings.QueueName,
                 durable: true,
                 exclusive: false,
@@ -170,12 +188,29 @@ namespace OT.Assessment.App.Services
                 cancellationToken: cancellationToken);
         }
 
+        private static async Task CloseAsync(IChannel[] channels)
+        {
+            if (channels == null)
+            {
+                return;
+            }
+
+            foreach (var channel in channels)
+            {
+                try
+                {
+                    await channel.DisposeAsync();
+                }
+                catch
+                {
+                    // a channel of a lost connection is already closed
+                }
+            }
+        }
+
         public async ValueTask DisposeAsync()
         {
-            if (_channel != null)
-            {
-                await _channel.DisposeAsync();
-            }
+            await CloseAsync(_channels);
 
             if (_connection != null)
             {

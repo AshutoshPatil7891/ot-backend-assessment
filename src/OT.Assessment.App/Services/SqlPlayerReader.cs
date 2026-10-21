@@ -1,7 +1,7 @@
 ﻿
 using Dapper;
 using Microsoft.Data.SqlClient;
-using OT.Assessment.Common.Resp;
+using OT.Assessment.Common.Responses;
 using System.Data;
 using System.Diagnostics;
 
@@ -18,7 +18,7 @@ namespace OT.Assessment.App.Services
             _logger = logger;
         }
 
-        public async Task<PagedResp<PlayerBetResp>> GetPlayerBetsAsync(
+        public async Task<PagedResponse<PlayerBetResponse>> GetPlayerBetsAsync(
             Guid playerId,
             int page,
             int pageSize,
@@ -54,7 +54,7 @@ namespace OT.Assessment.App.Services
 
             int total = rows.Count > 0 ? rows[0].Total : 0;
 
-            var response = new PagedResp<PlayerBetResp>
+            var response = new PagedResponse<PlayerBetResponse>
             {
                 Page = page,
                 PageSize = pageSize,
@@ -62,7 +62,7 @@ namespace OT.Assessment.App.Services
                 TotalPages = (int)Math.Ceiling((double)total / pageSize)
             };
 
-            response.Data = rows.Select(r => new PlayerBetResp
+            response.Data = rows.Select(r => new PlayerBetResponse
             {
                 BetId = r.BetId,
                 Game = r.Game,
@@ -74,17 +74,17 @@ namespace OT.Assessment.App.Services
             return response;
         }
 
-        public async Task<List<TopSpenderResp>> GetTopSpendersAsync(
+        public async Task<List<TopSpenderResponse>> GetTopSpendersAsync(
             int count,
             CancellationToken cancellationToken = default)
         {
             using var connection = new SqlConnection(_connectionString);
 
             var timer = Stopwatch.StartNew();
-            List<TopSpenderResp> result;
+            List<TopSpenderResponse> result;
             try
             {
-                result = (await connection.QueryAsync<TopSpenderResp>(
+                result = (await connection.QueryAsync<TopSpenderResponse>(
                     new CommandDefinition(
                         "usp_GetTopSpenders",
                         new { Count = count },
@@ -119,7 +119,7 @@ namespace OT.Assessment.App.Services
             }
         }
 
-        private class PlayerBetRow : PlayerBetResp
+        private class PlayerBetRow : PlayerBetResponse
         {
             public int Total { get; set; }
         }

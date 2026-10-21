@@ -1,10 +1,10 @@
-﻿using OT.Assessment.Common.msg;
+﻿using OT.Assessment.Common.Messages;
 
 namespace OT.Assessment.App.Services
 {
     public interface IBetPublisher
     {
-        Task PublishAsync(CasinoBetMesg bet, CancellationToken cancellationToken = default);
+        Task PublishAsync(CasinoBetMessage bet, CancellationToken cancellationToken = default);
     }
 }
 

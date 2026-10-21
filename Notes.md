@@ -29,7 +29,7 @@ The brief's last item asks us to "surprise" with valuable additions. These were 
 - **One-command RabbitMQ (Docker Compose)** with its metrics plugin on. The README already linked to `docker/RabbitMQ/docker-up.bat`; that file now exists.
 - **Reliability.** Publisher confirms, a dead-letter queue for messages that can never be saved, retries for temporary database problems, and idempotent inserts (a repeated bet is stored once and counted as "skipped").
 - **Numbers that add up.** The dashboard and the Consumer log show how many messages were processed, how many became new rows (equal to the table) and how many were repeats skipped. So Tester count = API accepted = RabbitMQ received = saved + skipped, and saved = rows in the table. Checked in a full run: 7,000 = 6,599 saved + 401 skipped, and 6,599 rows.
-- **A database script that is safe to re-run**, 73 unit tests written test-first, and a start script for RabbitMQ (`docker\RabbitMQ\docker-up.bat`) plus a start and a stop script for each of the monitoring and log parts (`docker-up.bat` and `docker-down.bat` in `docker\monitoring` and `docker\elk`).
+- **A database script that is safe to re-run**, 107 unit tests written test-first, and a start script for RabbitMQ (`docker\RabbitMQ\docker-up.bat`) plus a start and a stop script for each of the monitoring and log parts (`docker-up.bat` and `docker-down.bat` in `docker\monitoring` and `docker\elk`).
 
 How to start and use the monitoring and log parts is described in "Bonus: monitoring, alerts and searchable logs" below.
 
@@ -49,6 +49,7 @@ Requirements: .NET 8 SDK, Docker (for RabbitMQ), SQL Server (local instance, Win
 
 - **Queue between the API and the database.** The API only validates and publishes, so a slow or unavailable database never slows or breaks bet capture. The Consumer can be restarted or scaled on its own.
 - **Reliable publishing.** The queue is durable, messages are persistent, and the API waits for the broker's publisher confirm before returning 200. So 200 means the broker has the bet. If RabbitMQ is down the API returns 503, not a false success.
+- **Publishing over several channels.** One channel sends one bet at a time (it waits for the broker's confirm for each bet), so with a single channel the API was the slow part. The API now publishes over 16 channels (setting `RabbitMq:PublishChannels`), each with its own lock, so many bets are in flight at once and every 200 still means the broker has the bet. I found this by measuring: the same Tester run on a scratch copy with 1, 8 and 16 channels gave a mean latency of about 30 s, 18 s and under 1 s. The channels are handed to requests only after all of them exist and the queues are declared, so a request cannot publish before the queue exists.
 - **Batched, idempotent writes.** The Consumer collects up to 500 messages or 200 ms and writes them with one stored procedure call (table-valued parameter, one transaction), then acknowledges the whole batch. Bets with a BetId that already exists are skipped, so redelivery after a failure cannot create duplicates.
 - **Dead-letter queue.** Messages that can never succeed (bad JSON, data that violates a constraint) go to `casino-bets.dead` instead of blocking the queue. Temporary failures (for example the database being down) are retried and the messages are requeued.
 - **Database design.** Tables: `Player`, `Game`, `CasinoBet`, `PlayerSpendTotal`. `PlayerSpendTotal` keeps a running total per player, so top spenders reads a small table instead of summing all bets. Money is `DECIMAL(19,4)`, time is `DATETIMEOFFSET`, keys are GUIDs. An index on `CasinoBet (AccountId, CreatedDateTime DESC)` serves the player's-bets query, and one on the total serves top spenders. Paging uses `OFFSET/FETCH` with `COUNT(*) OVER()` for the total.
@@ -83,23 +84,25 @@ Everything below is optional: the assessment runs without it. Each part has its 
 
 ## Test results
 
-Provided Tester, final run on a freshly created database, with the API, the Consumer, RabbitMQ and the monitoring stack running (7,000 requests, injected by the Tester at 500 every 2 seconds, which takes about 30 seconds):
+Provided Tester, final runs on a freshly created database, with the API, the Consumer, RabbitMQ and the monitoring stack running (7,000 requests, injected by the Tester at 500 every 2 seconds, which takes about 30 seconds). Latest run:
 
 | Stage | Count |
 |---|---|
 | Tester: requests answered 200 / failed | 7,000 / 0 |
 | API: accepted / rejected / could not queue | 7,000 / 0 / 0 |
 | RabbitMQ: received / acknowledged | 7,000 / 7,000 |
-| Consumer: **saved as new rows** + **repeats skipped** | **6,599** + **401** = 7,000 |
-| Rows in `CasinoBet` | **6,599** (equals "saved") |
-| Players / games / spend totals | 997 / 979 / 997 |
-| Queue and dead-letter queue at the end | empty, nothing requeued, no retries |
+| Consumer: **saved as new rows** + **repeats skipped** | **6,837** + **163** = 7,000 |
+| Rows in `CasinoBet` | **6,837** (equals "saved") |
+| Players / games / spend totals | 998 / 979 / 998 |
+| Queue and dead-letter queue at the end | empty, nothing requeued |
 
-- **Latency:** the mean time for a request to complete was about 20 s in this run (min 0.2 s, max 30 s). Across the runs I did on one day it varied between about 20 s and 50 s, with the old code (before any logging or metrics) and the current code inside the same range, so the variation comes from machine load, not from the code. The "RPS = 233 / 250" figure in the Tester's summary is its injection schedule, not the speed of the API.
-- **CPU and memory at the peak of the load:** API about 98 percent of one core and 308 MB, Consumer about 24 percent and 90 MB, RabbitMQ about 16 percent and 194 MB. The API is the busy part.
-- **GET endpoints:** checked after the run and **during** an earlier run. Every call returned 200; response time rose from about 25 ms to at most about 0.7 s under load and then recovered.
-- **Unit tests:** 73 passing (controller, message contract, logging and metrics, written test-first).
-- **Alerts:** none fired during this run (the "slow publishing" rule needs 2 minutes above 10 s and the load lasted about 70 s); the dead-letter and "down" alerts were tested separately.
+- **Speed:** the Tester run finished in about 42 s, with a mean request latency of 3.0 s (min 0.2 s, max 6.8 s). The run before it gave 7.9 s mean and 10.6 s max. Before the API published over several channels the same test took 71 to 103 s with a mean latency of 20 to 50 s. I also checked that the per-request logging and the metrics are not the cause of any slowness: the same test against the code from before they were added gave the same latency (40 s and 44 s, against 39 s for the current code at that time).
+- **Reading the Tester's summary:** the "RPS = 233 / 250" in it is its injection schedule (7,000 requests over about 30 s), not the speed of the API; the latency figures are the useful ones.
+- **CPU and memory at the peak of the load:** API about 130 to 170 percent of one core (it now uses several cores) and about 270 to 290 MB, Consumer about 17 to 21 percent and 85 to 91 MB, RabbitMQ about 17 to 23 percent and about 200 to 211 MB. Up to 4,000 to 6,000 bets wait in the queue at the peak before the Consumer catches up.
+- **GET endpoints:** checked after the run and **during** an earlier run. Every call returned 200; response time rose from about 25 ms to at most about 0.7 s under load and then recovered. The responses use exactly the field names of the brief (`wagerId, game, provider, amount, createdDate`; `data, page, pageSize, total, totalPages`; `accountId, username, totalAmountSpend`).
+- **Unit tests:** 107 passing (controller, message and response contracts, SQL error rule, channel selection, logging and metrics, written test-first).
+- **Alerts:** "Consumer is retrying database saves" lit up once, as designed, after a run in which the Consumer had to retry a database save one time; nothing else fired. The dead-letter and "down" alerts were tested separately.
+- **Checked on the real stack for the channel pool:** a cold start with no queues and 300 requests arriving at once (all 300 messages arrived in the queue), and a RabbitMQ outage (the API answered 503 while it was down and recovered about 36 s after it was back, rebuilding all 16 channels).
 
 **Why the table has fewer rows than the Tester sends:** the Tester prepares 10,000 payloads with unique ids but sends `total[context.InvocationNumber]`, and under its load pattern some payloads are sent twice and others never (the share differs from run to run: 217 and 401 repeats in two runs). The Consumer is idempotent by design, so a repeated BetId is stored once and counted as "skipped"; the dashboard and the Consumer log show both numbers, so saved + skipped always equals what the API accepted. No acknowledged bet was lost. The Tester itself was not changed. Every Tester run creates new bet ids, so reset the database before a clean measurement.
 
@@ -147,6 +150,11 @@ Provided Tester, final run on a freshly created database, with the API, the Cons
 1. Run `DatabaseGenerate.sql` a second time on a database that already has every object. Expect exit code 0, no errors, no data lost.
 2. Do it twice, then check that all tables, indexes, the table type and the procedures are still there.
 
+**H. Speed of the publish path**
+1. The Tester's mean latency was 20 to 50 s. I first suspected the new logging and metrics, so I ran the same Tester run on a scratch copy of the code from before they existed: same latency, so they were not the cause.
+2. I then changed a scratch copy to publish over 1, 8 and 16 channels (a setting read from an environment variable) and ran the same Tester run each time: mean latency about 30 s, 18 s and under 1 s. The few failures in those runs came from a start-up race in my experiment code (a request could use the channels before they were all created), not from the real code, and were fixed by only handing out the channels once they are all ready.
+3. The real code now uses a pool of 16 channels (setting `PublishChannels`), checked with two full runs (all counts reconcile), a cold start with no queues, and an outage with recovery.
+
 ## Challenges
 
 - **Stored count lower than the Tester's count.** Investigated with a separate copy of the stack (own queues and database) and a per-batch log of messages versus rows gained. Cause: repeated payloads in the Tester, handled correctly by the idempotent insert (see above).
@@ -154,10 +162,13 @@ Provided Tester, final run on a freshly created database, with the API, the Cons
 - **Windows locking the running API/Consumer files** when rebuilding while they ran. Stop the running copy before building.
 - **Docker Desktop not starting** after a WSL problem; fixed by restarting WSL and Docker.
 - **A 404 from the Tester at first**: the route name did not match the Tester's `casinowager`. Restored the route.
+- **The API was the slow part, not the Consumer.** Found by measuring (see H above), after ruling out my own first guess (logging and metrics).
+- **The response field `betId` instead of `wagerId`** in the player-bets endpoint was found when re-reading the brief; fixed and covered by tests that pin the exact field names.
+- **A start-up race in the publisher:** the channel could be used by other requests before the queues were declared. Fixed by handing out the channels only when everything is ready.
 
 ## Known limits and production improvements
 
-- **Throughput of the publish path.** The API publishes one message at a time and waits for each confirm, so under the Tester's load requests queue up and the mean latency is between about 20 s and 50 s depending on how busy the machine is (the API reaches about 98 percent of one core). For production: a pool of channels, or batched confirms, plus a bounded in-flight limit. I kept the simple version because it keeps "200 means safely queued" easy to reason about.
+- **Throughput of the publish path.** The API now publishes over 16 channels, which cut the mean latency under the Tester's load from 20-50 s to about 3-8 s on this laptop. The API still uses a lot of CPU and up to a few thousand bets wait in the queue at the peak. For production: tune the number of channels to the machine, batch the confirms, put a limit on bets in flight, and run several Consumer instances on the same queue.
 - **Validation:** add length limits on text fields (database column sizes) and return 400 with details.
 - **Operations:** health checks (API, RabbitMQ, database), correlation ids in the logs, central log collection (instead of local files) with retention and clean-up of old files, metrics and alerts (queue depth, dead-letter count), rate limiting.
 - **Security:** no default `guest` credentials, secrets from a vault or environment variables, TLS to RabbitMQ and SQL Server with a trusted certificate, authentication on the API.

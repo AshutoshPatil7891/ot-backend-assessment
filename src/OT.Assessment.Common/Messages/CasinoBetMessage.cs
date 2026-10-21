@@ -1,9 +1,9 @@
 ﻿
 using System.Text.Json.Serialization;
 
-namespace OT.Assessment.Common.msg
+namespace OT.Assessment.Common.Messages
 {
-    public class CasinoBetMesg
+    public class CasinoBetMessage
     {
         [JsonPropertyName("wagerId")]
         public Guid BetId { get; set; }        

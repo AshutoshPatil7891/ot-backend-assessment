@@ -1,5 +1,5 @@
-using OT.Assessment.Common.msg;
-using OT.Assessment.Common.Resp;
+using OT.Assessment.Common.Messages;
+using OT.Assessment.Common.Responses;
 using System.Text.Json;
 
 namespace OT.Assessment.UnitTests
@@ -37,7 +37,7 @@ namespace OT.Assessment.UnitTests
         [Fact]
         public void TesterJson_BindsToTheMessage_AndExtraFieldsAreIgnored()
         {
-            var bet = JsonSerializer.Deserialize<CasinoBetMesg>(TesterJson, Web);
+            var bet = JsonSerializer.Deserialize<CasinoBetMessage>(TesterJson, Web);
 
             Assert.Equal(Guid.Parse("aa6700eb-1a06-483e-9739-d293dc7a9383"), bet.BetId);
             Assert.Equal(Guid.Parse("5ac75fec-23e9-27d1-b660-179eee70003d"), bet.AccountId);
@@ -54,7 +54,7 @@ namespace OT.Assessment.UnitTests
         [Fact]
         public void TesterJson_KeepsTheTimeZoneOffset()
         {
-            var bet = JsonSerializer.Deserialize<CasinoBetMesg>(TesterJson, Web);
+            var bet = JsonSerializer.Deserialize<CasinoBetMessage>(TesterJson, Web);
 
             Assert.Equal(TimeSpan.FromHours(2), bet.CreatedDateTime.Offset);
         }
@@ -66,7 +66,7 @@ namespace OT.Assessment.UnitTests
 
             // The publisher and the consumer both use the default options.
             var bytes = JsonSerializer.SerializeToUtf8Bytes(original);
-            var copy = JsonSerializer.Deserialize<CasinoBetMesg>(bytes);
+            var copy = JsonSerializer.Deserialize<CasinoBetMessage>(bytes);
 
             Assert.Equal(original.BetId, copy.BetId);
             Assert.Equal(original.AccountId, copy.AccountId);
@@ -89,7 +89,7 @@ namespace OT.Assessment.UnitTests
         [Fact]
         public void PagedResponse_UsesTheFieldNamesFromTheBrief()
         {
-            var page = new PagedResp<PlayerBetResp> { Page = 1, PageSize = 10, Total = 35, TotalPages = 4 };
+            var page = new PagedResponse<PlayerBetResponse> { Page = 1, PageSize = 10, Total = 35, TotalPages = 4 };
 
             using var doc = JsonDocument.Parse(JsonSerializer.Serialize(page, Web));
             var root = doc.RootElement;
@@ -104,7 +104,7 @@ namespace OT.Assessment.UnitTests
         [Fact]
         public void PlayerBetRow_UsesTheFieldNamesFromTheBrief()
         {
-            var row = new PlayerBetResp { Game = "Game X", Provider = "Prov 1", Amount = 500m, CreatedDate = DateTimeOffset.UtcNow };
+            var row = new PlayerBetResponse { Game = "Game X", Provider = "Prov 1", Amount = 500m, CreatedDate = DateTimeOffset.UtcNow };
 
             using var doc = JsonDocument.Parse(JsonSerializer.Serialize(row, Web));
             var root = doc.RootElement;
@@ -118,7 +118,7 @@ namespace OT.Assessment.UnitTests
         [Fact]
         public void TopSpenderRow_UsesTheFieldNamesFromTheBrief()
         {
-            var row = new TopSpenderResp { AccountId = Guid.NewGuid(), Username = "testUser1", TotalAmountSpend = 150m };
+            var row = new TopSpenderResponse { AccountId = Guid.NewGuid(), Username = "testUser1", TotalAmountSpend = 150m };
 
             using var doc = JsonDocument.Parse(JsonSerializer.Serialize(row, Web));
             var root = doc.RootElement;
@@ -135,7 +135,7 @@ namespace OT.Assessment.UnitTests
         {
             var json = TesterJson.Replace("5ac75fec-23e9-27d1-b660-179eee70003d", "not-a-guid");
 
-            Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<CasinoBetMesg>(json, Web));
+            Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<CasinoBetMessage>(json, Web));
         }
 
         [Fact]
@@ -143,19 +143,19 @@ namespace OT.Assessment.UnitTests
         {
             var json = TesterJson.Replace("38273.974454660885", "\"lots\"");
 
-            Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<CasinoBetMesg>(json, Web));
+            Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<CasinoBetMessage>(json, Web));
         }
 
         [Fact]
         public void BrokenJson_IsRejected()
         {
-            Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<CasinoBetMesg>("{ this is not json", Web));
+            Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<CasinoBetMessage>("{ this is not json", Web));
         }
 
         [Fact]
         public void MissingFields_LeaveNullsAndZeros_WhichTheControllerThenRejects()
         {
-            var bet = JsonSerializer.Deserialize<CasinoBetMesg>("{}", Web);
+            var bet = JsonSerializer.Deserialize<CasinoBetMessage>("{}", Web);
 
             Assert.Equal(Guid.Empty, bet.AccountId);
             Assert.Null(bet.Username);

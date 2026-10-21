@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OT.Assessment.App.Controllers;
-using OT.Assessment.Common.msg;
+using OT.Assessment.Common.Messages;
 using OT.Assessment.UnitTests.Fakes;
 
 namespace OT.Assessment.UnitTests
@@ -15,9 +15,9 @@ namespace OT.Assessment.UnitTests
             return new PlayerController(publisher, reader, logger ?? NullLogger<PlayerController>.Instance);
         }
 
-        public static CasinoBetMesg ValidBet()
+        public static CasinoBetMessage ValidBet()
         {
-            return new CasinoBetMesg
+            return new CasinoBetMessage
             {
                 BetId = Guid.Parse("aa6700eb-1a06-483e-9739-d293dc7a9383"),
                 AccountId = Guid.Parse("5ac75fec-23e9-27d1-b660-179eee70003d"),

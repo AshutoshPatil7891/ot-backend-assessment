@@ -1,5 +1,5 @@
 using OT.Assessment.App.Services;
-using OT.Assessment.Common.Resp;
+using OT.Assessment.Common.Responses;
 
 namespace OT.Assessment.UnitTests.Fakes
 {
@@ -9,9 +9,9 @@ namespace OT.Assessment.UnitTests.Fakes
     /// </summary>
     public class FakePlayerReader : IPlayerReader
     {
-        public PagedResp<PlayerBetResp> BetsToReturn { get; set; } = new PagedResp<PlayerBetResp>();
+        public PagedResponse<PlayerBetResponse> BetsToReturn { get; set; } = new PagedResponse<PlayerBetResponse>();
 
-        public List<TopSpenderResp> SpendersToReturn { get; set; } = new List<TopSpenderResp>();
+        public List<TopSpenderResponse> SpendersToReturn { get; set; } = new List<TopSpenderResponse>();
 
         public int BetsCallCount { get; private set; }
         public int SpendersCallCount { get; private set; }
@@ -21,7 +21,7 @@ namespace OT.Assessment.UnitTests.Fakes
         public int LastPageSize { get; private set; }
         public int LastCount { get; private set; }
 
-        public Task<PagedResp<PlayerBetResp>> GetPlayerBetsAsync(
+        public Task<PagedResponse<PlayerBetResponse>> GetPlayerBetsAsync(
             Guid playerId, int page, int pageSize, CancellationToken cancellationToken = default)
         {
             BetsCallCount++;
@@ -31,7 +31,7 @@ namespace OT.Assessment.UnitTests.Fakes
             return Task.FromResult(BetsToReturn);
         }
 
-        public Task<List<TopSpenderResp>> GetTopSpendersAsync(
+        public Task<List<TopSpenderResponse>> GetTopSpendersAsync(
             int count, CancellationToken cancellationToken = default)
         {
             SpendersCallCount++;

@@ -1,5 +1,5 @@
 using OT.Assessment.App.Services;
-using OT.Assessment.Common.msg;
+using OT.Assessment.Common.Messages;
 
 namespace OT.Assessment.UnitTests.Fakes
 {
@@ -9,11 +9,11 @@ namespace OT.Assessment.UnitTests.Fakes
     /// </summary>
     public class FakeBetPublisher : IBetPublisher
     {
-        public List<CasinoBetMesg> Published { get; } = new List<CasinoBetMesg>();
+        public List<CasinoBetMessage> Published { get; } = new List<CasinoBetMessage>();
 
         public Exception ExceptionToThrow { get; set; }
 
-        public Task PublishAsync(CasinoBetMesg bet, CancellationToken cancellationToken = default)
+        public Task PublishAsync(CasinoBetMessage bet, CancellationToken cancellationToken = default)
         {
             if (ExceptionToThrow != null)
             {

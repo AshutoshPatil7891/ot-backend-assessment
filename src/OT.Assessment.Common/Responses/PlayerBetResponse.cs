@@ -1,10 +1,11 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace OT.Assessment.Common.Resp
+namespace OT.Assessment.Common.Responses
 
 {
-    public class PlayerBetResp
+    public class PlayerBetResponse
     {
+        [JsonPropertyName("wagerId")]
         public Guid BetId { get; set; }
         public string Game { get; set; }
         public string Provider { get; set; }

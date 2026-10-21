@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using OT.Assessment.Common.Resp;
+using OT.Assessment.Common.Responses;
 using OT.Assessment.UnitTests.Fakes;
 
 namespace OT.Assessment.UnitTests
@@ -17,12 +17,12 @@ namespace OT.Assessment.UnitTests
         [Fact]
         public async Task ValidRequest_ReturnsOkWithTheReadersPage()
         {
-            _reader.BetsToReturn = new PagedResp<PlayerBetResp>
+            _reader.BetsToReturn = new PagedResponse<PlayerBetResponse>
             {
-                Data = new List<PlayerBetResp>
+                Data = new List<PlayerBetResponse>
                 {
-                    new PlayerBetResp { BetId = Guid.NewGuid(), Game = "Game X", Provider = "Prov 1", Amount = 10m },
-                    new PlayerBetResp { BetId = Guid.NewGuid(), Game = "Game Y", Provider = "Prov 2", Amount = 20m }
+                    new PlayerBetResponse { BetId = Guid.NewGuid(), Game = "Game X", Provider = "Prov 1", Amount = 10m },
+                    new PlayerBetResponse { BetId = Guid.NewGuid(), Game = "Game Y", Provider = "Prov 2", Amount = 20m }
                 },
                 Page = 1, PageSize = 10, Total = 2, TotalPages = 1
             };
@@ -63,13 +63,13 @@ namespace OT.Assessment.UnitTests
         [Fact]
         public async Task PlayerWithNoBets_ReturnsOkWithAnEmptyPage()
         {
-            _reader.BetsToReturn = new PagedResp<PlayerBetResp> { Page = 1, PageSize = 10, Total = 0, TotalPages = 0 };
+            _reader.BetsToReturn = new PagedResponse<PlayerBetResponse> { Page = 1, PageSize = 10, Total = 0, TotalPages = 0 };
             var controller = TestData.CreateController(_publisher, _reader);
 
             var result = await controller.GetPlayerBets(PlayerId, CancellationToken.None, 1, 10);
 
             var ok = Assert.IsType<OkObjectResult>(result.Result);
-            var page = Assert.IsType<PagedResp<PlayerBetResp>>(ok.Value);
+            var page = Assert.IsType<PagedResponse<PlayerBetResponse>>(ok.Value);
             Assert.Empty(page.Data);
             Assert.Equal(0, page.Total);
         }

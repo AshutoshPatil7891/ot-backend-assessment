@@ -1,5 +1,5 @@
 ﻿
-using OT.Assessment.Common.msg;
+using OT.Assessment.Common.Messages;
 
 namespace OT.Assessment.Consumer.Services
 {
@@ -10,7 +10,7 @@ namespace OT.Assessment.Consumer.Services
         /// (or repeated inside the batch) is skipped, so the number can be lower than bets.Count.
         /// </summary>
         Task<int> WriteBatchAsync(
-            IReadOnlyList<CasinoBetMesg> bets,
+            IReadOnlyList<CasinoBetMessage> bets,
             CancellationToken cancellationToken = default);
     }
 }

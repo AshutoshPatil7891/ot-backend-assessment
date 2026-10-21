@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using OT.Assessment.Common.Resp;
+using OT.Assessment.Common.Responses;
 using OT.Assessment.UnitTests.Fakes;
 
 namespace OT.Assessment.UnitTests
@@ -15,10 +15,10 @@ namespace OT.Assessment.UnitTests
         [Fact]
         public async Task ValidCount_ReturnsOkWithTheReadersList()
         {
-            _reader.SpendersToReturn = new List<TopSpenderResp>
+            _reader.SpendersToReturn = new List<TopSpenderResponse>
             {
-                new TopSpenderResp { AccountId = Guid.NewGuid(), Username = "Ravi", TotalAmountSpend = 1250m },
-                new TopSpenderResp { AccountId = Guid.NewGuid(), Username = "Jay", TotalAmountSpend = 900m }
+                new TopSpenderResponse { AccountId = Guid.NewGuid(), Username = "Ravi", TotalAmountSpend = 1250m },
+                new TopSpenderResponse { AccountId = Guid.NewGuid(), Username = "Jay", TotalAmountSpend = 900m }
             };
             var controller = TestData.CreateController(_publisher, _reader);
 
@@ -60,7 +60,7 @@ namespace OT.Assessment.UnitTests
             var result = await controller.GetTopSpenders(CancellationToken.None, 10);
 
             var ok = Assert.IsType<OkObjectResult>(result.Result);
-            var list = Assert.IsType<List<TopSpenderResp>>(ok.Value);
+            var list = Assert.IsType<List<TopSpenderResponse>>(ok.Value);
             Assert.Empty(list);
         }
 

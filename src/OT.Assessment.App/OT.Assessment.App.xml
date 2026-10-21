@@ -4,7 +4,7 @@
         <name>OT.Assessment.App</name>
     </assembly>
     <members>
-        <member name="M:OT.Assessment.App.Controllers.PlayerController.PostCasinoBet(OT.Assessment.Common.msg.CasinoBetMesg,System.Threading.CancellationToken)">
+        <member name="M:OT.Assessment.App.Controllers.PlayerController.PostCasinoBet(OT.Assessment.Common.Messages.CasinoBetMessage,System.Threading.CancellationToken)">
             <summary>
             Sends one bet data to the RabbitMQ queue and waits until RabbitMQ confirms it has received it.
             Connects on first use and reuses the same connection afterwards.
@@ -37,6 +37,13 @@
             Call once at startup. .NET creates the metrics below the first time this class is used,
             so without this they would be missing from /metrics until the first bet arrives
             (Grafana would show "No data" instead of 0).
+            </summary>
+        </member>
+        <member name="T:OT.Assessment.App.Services.PublishSlot">
+            <summary>
+            Picks which of the publisher's channels sends the next bet: one after the other, so every channel
+            gets the same share of the bets. The counter is converted to an unsigned number first, so the
+            result stays inside the range even after the counter wraps around.
             </summary>
         </member>
     </members>

@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using OT.Assessment.Common.Resp;
+using OT.Assessment.Common.Responses;
 using OT.Assessment.UnitTests.Fakes;
 
 namespace OT.Assessment.UnitTests
@@ -82,9 +82,9 @@ namespace OT.Assessment.UnitTests
         public async Task PlayerBets_LogsInformationWithThePlayerPagingAndResultSize()
         {
             var playerId = Guid.NewGuid();
-            _reader.BetsToReturn = new PagedResp<PlayerBetResp>
+            _reader.BetsToReturn = new PagedResponse<PlayerBetResponse>
             {
-                Data = new List<PlayerBetResp> { new PlayerBetResp(), new PlayerBetResp() },
+                Data = new List<PlayerBetResponse> { new PlayerBetResponse(), new PlayerBetResponse() },
                 Total = 12
             };
 
@@ -118,11 +118,11 @@ namespace OT.Assessment.UnitTests
         [Fact]
         public async Task TopSpenders_LogsInformationWithTheCountAndHowManyWereReturned()
         {
-            _reader.SpendersToReturn = new List<TopSpenderResp>
+            _reader.SpendersToReturn = new List<TopSpenderResponse>
             {
-                new TopSpenderResp { Username = "Ravi" },
-                new TopSpenderResp { Username = "Jay" },
-                new TopSpenderResp { Username = "Mira" }
+                new TopSpenderResponse { Username = "Ravi" },
+                new TopSpenderResponse { Username = "Jay" },
+                new TopSpenderResponse { Username = "Mira" }
             };
 
             await CreateController().GetTopSpenders(CancellationToken.None, 10);
