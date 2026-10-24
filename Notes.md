@@ -2,7 +2,7 @@
 
 ## Overview
 
-Players' casino bets are captured by an API, queued in RabbitMQ, and stored in SQL Server by a background Consumer. Two read endpoints return a player's bets and the top spenders.
+Players' casino bets are captured by an API, queued in RabbitMQ, and stored in SQL Server by a background Consumer. Two read endpoints return a player's bets and the top spenders. A small React UI (login, player portal and admin portal) sits on top of these endpoints; it is described under "Bonus: web UI, login and admin portal".
 
 ```
 Tester -> POST api/player/casinowager -> API -> RabbitMQ (casino-bets) -> Consumer -> SQL Server
@@ -17,6 +17,7 @@ Tester -> POST api/player/casinowager -> API -> RabbitMQ (casino-bets) -> Consum
 | `OT.Assessment.Common` | Shared message, response and settings classes |
 | `OT.Assessment.UnitTests` | xUnit tests for the controller and message contract |
 | `OT.Assessment.Tester` | The provided load tester (not changed) |
+| `ui` | The React UI: login, player portal (choose a game, place a bet, see my bets) and admin portal (players, top spenders, run the tests). Not part of the .NET solution; run it with `npm run dev` |
 
 ## Bonus: extras added beyond the brief
 
@@ -29,7 +30,8 @@ The brief's last item asks us to "surprise" with valuable additions. These were 
 - **One-command RabbitMQ (Docker Compose)** with its metrics plugin on. The README already linked to `docker/RabbitMQ/docker-up.bat`; that file now exists.
 - **Reliability.** Publisher confirms, a dead-letter queue for messages that can never be saved, retries for temporary database problems, and idempotent inserts (a repeated bet is stored once and counted as "skipped").
 - **Numbers that add up.** The dashboard and the Consumer log show how many messages were processed, how many became new rows (equal to the table) and how many were repeats skipped. So Tester count = API accepted = RabbitMQ received = saved + skipped, and saved = rows in the table. Checked in a full run: 7,000 = 6,599 saved + 401 skipped, and 6,599 rows.
-- **A database script that is safe to re-run**, 107 unit tests written test-first, and a start script for RabbitMQ (`docker\RabbitMQ\docker-up.bat`) plus a start and a stop script for each of the monitoring and log parts (`docker-up.bat` and `docker-down.bat` in `docker\monitoring` and `docker\elk`).
+- **A database script that is safe to re-run**, 147 unit tests written test-first, and a start script for RabbitMQ (`docker\RabbitMQ\docker-up.bat`) plus a start and a stop script for each of the monitoring and log parts (`docker-up.bat` and `docker-down.bat` in `docker\monitoring` and `docker\elk`).
+- **A web UI with login, a player portal and an admin portal** (React, hooks and plain CSS files, no UI libraries). Players choose a game, place a bet and see their bets; the admin searches players, sees top spenders and runs the unit tests or the load test. It only adds new files and new database objects; the original endpoints, the Consumer and `DatabaseGenerate.sql` are unchanged. It is described, with the install and run steps, under "Bonus: web UI, login and admin portal" below.
 
 How to start and use the monitoring and log parts is described in "Bonus: monitoring, alerts and searchable logs" below.
 
@@ -82,9 +84,11 @@ Everything below is optional: the assessment runs without it. Each part has its 
 | `GET api/player/{playerId}/casino?page=1&pageSize=10` | A player's bets, newest first, paged. `pageSize` 1-100, 400 otherwise. A non-GUID id returns 404. |
 | `GET api/player/topSpenders?count=10` | Top players by total amount spent, highest first. `count` 1-100, 400 otherwise. |
 
+The login, games and admin endpoints that the UI uses are listed under "Bonus: web UI, login and admin portal" below.
+
 ## Bonus: web UI, login and admin portal
 
-A small React UI was added on top of the finished API, on its own branch (`feature/ui-login-admin-endpoints`). **Nothing that existed before was changed:** `PlayerController`, the three endpoints, the Consumer, the existing stored procedures and `DatabaseGenerate.sql` are as they were. The additions are new files, new SQL objects in a separate script, and a few lines in `Program.cs` and `appsettings.json` (service registration, CORS, the admin login).
+A small React UI was added on top of the finished API. It was developed on its own branch (`feature/ui-login-admin-endpoints`) and is now merged into `main`. **Nothing that existed before was changed:** `PlayerController`, the three endpoints, the Consumer, the existing stored procedures and `DatabaseGenerate.sql` are as they were. The additions are new files, new SQL objects in a separate script, and a few lines in `Program.cs` and `appsettings.json` (service registration, CORS, the admin login).
 
 **What the user sees**
 
@@ -220,7 +224,7 @@ Provided Tester, final runs on a freshly created database, with the API, the Con
 - **Reading the Tester's summary:** the "RPS = 233 / 250" in it is its injection schedule (7,000 requests over about 30 s), not the speed of the API; the latency figures are the useful ones.
 - **CPU and memory at the peak of the load:** API about 130 to 170 percent of one core (it now uses several cores) and about 270 to 290 MB, Consumer about 17 to 21 percent and 85 to 91 MB, RabbitMQ about 17 to 23 percent and about 200 to 211 MB. Up to 4,000 to 6,000 bets wait in the queue at the peak before the Consumer catches up.
 - **GET endpoints:** checked after the run and **during** an earlier run. Every call returned 200; response time rose from about 25 ms to at most about 0.7 s under load and then recovered. The responses use exactly the field names of the brief (`wagerId, game, provider, amount, createdDate`; `data, page, pageSize, total, totalPages`; `accountId, username, totalAmountSpend`).
-- **Unit tests:** 107 passing (controller, message and response contracts, SQL error rule, channel selection, logging and metrics, written test-first).
+- **Unit tests:** 147 passing now: 107 for the API and Consumer at the time of this run (controller, message and response contracts, SQL error rule, channel selection, logging and metrics, written test-first), plus 40 added later for the UI's login, games and admin endpoints.
 - **Alerts:** "Consumer is retrying database saves" lit up once, as designed, after a run in which the Consumer had to retry a database save one time; nothing else fired. The dead-letter and "down" alerts were tested separately.
 - **Checked on the real stack for the channel pool:** a cold start with no queues and 300 requests arriving at once (all 300 messages arrived in the queue), and a RabbitMQ outage (the API answered 503 while it was down and recovered about 36 s after it was back, rebuilding all 16 channels).
 
@@ -229,7 +233,7 @@ Provided Tester, final runs on a freshly created database, with the API, the Con
 ## How I tested, step by step
 
 **A. Unit tests**
-1. `dotnet test` in the repository root runs 51 xUnit tests.
+1. `dotnet test` in the repository root runs all 147 xUnit tests. The points below describe the tests of the original API; the tests added for the UI are described in "Bonus: web UI, login and admin portal".
 2. They cover the POST endpoint (valid bet, optional fields missing, tiny amounts, every required field missing or invalid, broker failure returns 503, client cancellation is not turned into a 503), both GET endpoints (paging limits, empty results, bad input) and the message contract.
 3. The tests use small hand-written fakes for the publisher and the reader, so they need no RabbitMQ or database. They were written test-first: each new test was seen failing before the code was changed.
 
