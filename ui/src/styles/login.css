@@ -1,0 +1,116 @@
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(300px, 5fr) 6fr;
+}
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  padding: 48px;
+  background: var(--baize);
+  color: #fff;
+}
+
+.login-brand h1 {
+  font-size: 34px;
+  font-weight: 600;
+}
+
+.login-brand p {
+  max-width: 28ch;
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* a small stack of chips, the same ones the player uses to stake a bet */
+.chip-stack {
+  display: flex;
+  gap: 10px;
+}
+
+.chip-stack span {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 5px dashed rgba(255, 255, 255, 0.85);
+}
+
+.chip-stack .red {
+  background: var(--chip-red);
+  box-shadow: 0 0 0 3px var(--chip-red);
+}
+
+.chip-stack .blue {
+  background: var(--chip-blue);
+  box-shadow: 0 0 0 3px var(--chip-blue);
+}
+
+.chip-stack .green {
+  background: var(--chip-green);
+  box-shadow: 0 0 0 3px var(--chip-green);
+}
+
+.chip-stack .black {
+  background: var(--chip-black);
+  box-shadow: 0 0 0 3px var(--chip-black);
+}
+
+.login-form-side {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+}
+
+.login-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.login-card h2 {
+  font-size: 26px;
+}
+
+.login-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.login-card .button {
+  padding: 11px 18px;
+}
+
+.login-card .link {
+  align-self: flex-start;
+}
+
+@media (max-width: 800px) {
+  .login-page {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .login-brand {
+    padding: 24px 20px;
+    gap: 14px;
+  }
+
+  .login-brand h1 {
+    font-size: 26px;
+  }
+
+  .login-brand p {
+    font-size: 15px;
+  }
+}

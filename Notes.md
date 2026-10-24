@@ -82,6 +82,87 @@ Everything below is optional: the assessment runs without it. Each part has its 
 | `GET api/player/{playerId}/casino?page=1&pageSize=10` | A player's bets, newest first, paged. `pageSize` 1-100, 400 otherwise. A non-GUID id returns 404. |
 | `GET api/player/topSpenders?count=10` | Top players by total amount spent, highest first. `count` 1-100, 400 otherwise. |
 
+## Bonus: web UI, login and admin portal
+
+A small React UI was added on top of the finished API, on its own branch (`feature/ui-login-admin-endpoints`). **Nothing that existed before was changed:** `PlayerController`, the three endpoints, the Consumer, the existing stored procedures and `DatabaseGenerate.sql` are as they were. The additions are new files, new SQL objects in a separate script, and a few lines in `Program.cs` and `appsettings.json` (service registration, CORS, the admin login).
+
+**What the user sees**
+
+- **Login page.** Players log in or create an account; the admin logs in on the same form.
+- **Player portal.** Choose a game (real radio inputs, shown as tiles with a search box and paging), pick a stake with chips or type an amount, place the bet (the existing `POST api/player/casinowager`), and see "My bets" (the existing `GET api/player/{id}/casino`).
+- **Admin portal.** *Players* (every account that can log in, with a search box and "View bets"), *Top spenders* (the existing `GET api/player/topSpenders`, with "View bets" per player) and *Tests* (runs the unit tests or the provided load Tester and shows the output).
+
+**New endpoints** (each in its own controller, none touches the old ones)
+
+| Endpoint | Controller | Behaviour |
+|---|---|---|
+| `POST api/auth/register` | `AuthController` | Creates a player with a login name and password. 400 for missing fields or a password under 4 characters, 409 if the name is taken. |
+| `POST api/auth/login` | `AuthController` | Returns the role (`player` or `admin`) and the account id. The admin also gets a token. 401 for a wrong login. |
+| `GET api/games` | `GamesController` | The games a player can choose from. |
+| `GET api/admin/players?search=&count=` | `AdminController` | Players that have a login, with their total spent. Needs the admin token (`X-Admin-Token`). 401 without it, 400 if `count` is not 1-100. |
+| `POST api/admin/tests/{unit\|load}` | `AdminController` | Runs `dotnet test` or the Tester as a child process and returns pass/fail, seconds and output. Needs the admin token. 409 if a run is already going. |
+
+**Database changes** (all in `DatabaseUiSupport.sql`, run after `DatabaseGenerate.sql`, safe to re-run)
+
+- Two **nullable** columns on `Player`: `LoginName` and `PasswordHash`. `Username` already existed and is the display name, so the login name is a separate column. Existing rows and the Consumer's inserts are unaffected, because the Consumer lists its columns explicitly and never updates an existing player.
+- Passwords are stored as a salted PBKDF2 hash (`PasswordHasher`), never as plain text.
+- Five real games are added so the player has something to choose before any bet has been saved, and four small stored procedures (`usp_RegisterPlayer`, `usp_GetPlayerLogin`, `usp_GetGames`, `usp_GetRegisteredPlayers`) serve the new endpoints.
+- **A mistake found and fixed while testing:** the first version of the script put a *unique filtered index* on `LoginName`. SQL Server needs `QUOTED_IDENTIFIER ON` for any write to a table with a filtered index, and the Consumer's existing procedure does not use it, so saving bets failed with error 1934. This showed up in a smoke test (a bet was accepted but never saved). The index was replaced by a plain one, and uniqueness of the login name is now checked inside `usp_RegisterPlayer` in one locked transaction. The script also drops the old index if it is there.
+
+**Simple on purpose**
+
+- The admin logs in with a name and password from `appsettings.json` (`Admin` section, `admin` / `admin`, **local development only**). The login returns a random token that is kept in memory (lost on restart) and checked by the admin endpoints. There are no JWTs, roles or refresh tokens; the existing GET endpoints stay open, as before.
+- The test runner builds into a separate temporary folder (`--artifacts-path`), so running the tests never overwrites the files of the API that is running. Only one run at a time.
+- For the demo, every player that the Tester created earlier was given a login: login name = the existing username, password = the first name followed by `$1234` (for example `Eloise_Glover` / `Eloise$1234`). This was done once with a throw-away tool that is not part of the repository. These passwords are guessable and are for a local test database only.
+
+**What to install (once)**
+
+Everything in "Setup" (.NET 8 SDK, Docker, SQL Server) plus:
+
+| Needed | Why | Check |
+|---|---|---|
+| **Node.js 18 or newer** (built and tested with Node 22; includes `npm`) from https://nodejs.org | Runs the React dev server and installs the UI's packages | `node -v` and `npm -v` |
+| A modern browser (Chrome, Edge or Firefox) | The UI uses current CSS | |
+| The .NET HTTPS development certificate, trusted | The UI calls the API on https://localhost:7120 | `dotnet dev-certs https --trust` |
+
+The UI's own packages are installed by `npm install` (React 18.3.1, React DOM, Vite 5.4.11 and the Vite React plugin; versions are pinned in `ui/package.json`). There are no other libraries and nothing to install globally.
+
+**How to run**
+
+1. Start RabbitMQ (`docker\RabbitMQ\docker-up.bat`), then the API (`dotnet run --launch-profile https` in `src\OT.Assessment.App`) and the Consumer (`dotnet run` in `src\OT.Assessment.Consumer`), as described in "Setup". Without the Consumer a bet is accepted but never appears in "My bets".
+2. Run `DatabaseUiSupport.sql` once, after `DatabaseGenerate.sql`: `sqlcmd -S localhost -E -C -b -i DatabaseUiSupport.sql`.
+3. Install and start the UI. In a new terminal:
+   ```
+   cd ui
+   npm install
+   npm run dev
+   ```
+   `npm install` is needed only the first time (or after `package.json` changes).
+4. Open **http://localhost:5173**. The port is fixed on purpose: the API only allows calls from http://localhost:5173 and http://localhost:3000 (`Cors:AllowedOrigins` in `appsettings.json`).
+5. Log in. Admin: `admin` / `admin`. Player: create one with "New player? Create an account", or use any seeded player, for example `Walter33` / `Walter$1234` (password = first name + `$1234`).
+
+The API address defaults to https://localhost:7120. To point the UI elsewhere, set `VITE_API_URL` (for example `set VITE_API_URL=https://localhost:7120` before `npm run dev`) and add the UI's address to `Cors:AllowedOrigins`.
+
+`npm run build` makes a production build in `ui/dist` (it checks that the UI compiles); the dev server is the supported way to run it for this assessment.
+
+**If something does not work**
+
+| What you see | Cause and fix |
+|---|---|
+| "Failed to fetch" on the login page | The API is not running, or the browser does not trust its certificate. Start the API, run `dotnet dev-certs https --trust`, and open https://localhost:7120/swagger once. |
+| `npm: command not found` | Node.js is not installed, or the terminal was opened before installing it. Install Node.js and open a new terminal. |
+| "Port 5173 is already in use" | Another copy of the UI is running. Close it. The port must stay 5173 for CORS. |
+| The games list is empty | `DatabaseUiSupport.sql` was not run, or the API cannot reach SQL Server. |
+| A bet is accepted but not in "My bets" | The Consumer is not running, or RabbitMQ is down (the API answers 503 in that case). Start both, then press Refresh. |
+| The admin pages show an error after the API restarted | The admin token lives in memory and is lost on restart. Log out and log in again. |
+| The admin test buttons fail | The API must run from `src\OT.Assessment.App` (it finds the solution two folders up), or set `Admin:SolutionPath` in `appsettings.json`. The load test also needs RabbitMQ, the Consumer and the database. |
+
+**Testing**
+
+- 40 new unit tests (hashing, register and login, the games list, the admin endpoints and their 401 / 400 / 409 cases); the full suite is **147 passing**.
+- Checked by hand against the real stack: register, duplicate register (409), login, wrong password (401), admin login, admin endpoints without a token (401), the unit tests started from the admin portal, CORS from the UI's address, a bet placed as a player and saved by the Consumer, and the player's "My bets" and the admin pages showing it.
+- **Not covered:** the React screens have no automated tests (they were checked by eye and with screenshots), and the admin "Run load test" button was not run from the portal because it adds about 7,000 bets to the database.
+
 ## Test results
 
 Provided Tester, final runs on a freshly created database, with the API, the Consumer, RabbitMQ and the monitoring stack running (7,000 requests, injected by the Tester at 500 every 2 seconds, which takes about 30 seconds). Latest run:

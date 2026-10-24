@@ -1,0 +1,382 @@
+/* ---------- panels ---------- */
+
+.panel {
+  margin-bottom: 20px;
+  padding: 20px 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.panel h2 {
+  font-size: 19px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.panel-note {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ---------- player: games and bet slip ---------- */
+
+.bet-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+}
+
+.bet-layout .panel {
+  margin-bottom: 0;
+}
+
+.search {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+/* game tiles: name, provider and theme. The radio input stays in the page (keyboard and screen
+   readers use it) but is hidden, the tile itself shows the choice. */
+.games {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.game-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 4px;
+  min-height: 104px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.game-tile:hover {
+  border-color: var(--baize);
+}
+
+.game-tile input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.game-tile:has(input:focus-visible) {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.game-name {
+  font-weight: 600;
+  line-height: 1.3;
+  padding-right: 26px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.game-provider {
+  color: var(--muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-theme {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: var(--baize-soft);
+  color: var(--baize);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* the chosen tile is filled, so there is no doubt which game the bet is for */
+.game-tile:has(input:checked) {
+  border-color: var(--baize);
+  background: var(--baize);
+  color: #fff;
+}
+
+.game-tile:has(input:checked) .game-provider {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.game-tile:has(input:checked) .game-theme {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.game-tile:has(input:checked)::after {
+  content: '\2713';
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: var(--baize-dark);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ---------- player: bet slip ---------- */
+
+.bet-slip {
+  position: sticky;
+  top: 16px;
+  border-top: 4px solid var(--gold);
+  box-shadow: 0 6px 18px rgba(18, 55, 42, 0.12);
+}
+
+.slip-game {
+  margin: 12px 0 18px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--paper);
+  font-weight: 600;
+}
+
+.slip-game.empty {
+  color: var(--muted);
+  font-weight: normal;
+}
+
+.chips {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.chip {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 5px dashed rgba(255, 255, 255, 0.85);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.chip:hover {
+  transform: translateY(-2px);
+}
+
+.chip:active {
+  transform: translateY(1px);
+}
+
+.chip.red {
+  background: var(--chip-red);
+  box-shadow: 0 0 0 3px var(--chip-red);
+}
+
+.chip.blue {
+  background: var(--chip-blue);
+  box-shadow: 0 0 0 3px var(--chip-blue);
+}
+
+.chip.green {
+  background: var(--chip-green);
+  box-shadow: 0 0 0 3px var(--chip-green);
+}
+
+.chip.black {
+  background: var(--chip-black);
+  box-shadow: 0 0 0 3px var(--chip-black);
+}
+
+/* the chosen chip gets a gold ring */
+.chip[aria-pressed='true'] {
+  outline: 3px solid var(--gold);
+  outline-offset: 3px;
+}
+
+.amount {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.amount input {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bet-slip .button {
+  width: 100%;
+  padding: 12px 18px;
+}
+
+/* ---------- tables ---------- */
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+
+th {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+tbody tr:hover {
+  background: var(--paper);
+}
+
+th.number,
+td.number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+tr.selected,
+tr.selected:hover {
+  background: var(--baize-soft);
+}
+
+.player-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pager {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ---------- admin ---------- */
+
+.tabs {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  padding: 10px 2px;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab:hover {
+  color: var(--ink);
+}
+
+.tab.active {
+  color: var(--baize);
+  border-bottom-color: var(--gold);
+}
+
+.button-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.result-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0 10px;
+}
+
+.pill {
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pill.passed {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.pill.failed {
+  background: var(--error-soft);
+  color: var(--error);
+}
+
+.output {
+  max-height: 360px;
+  overflow: auto;
+  margin: 0;
+  padding: 14px;
+  border-radius: 6px;
+  background: #101613;
+  color: #d3dcd6;
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 860px) {
+  .bet-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .bet-slip {
+    position: static;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+}

@@ -4,6 +4,46 @@
         <name>OT.Assessment.App</name>
     </assembly>
     <members>
+        <member name="T:OT.Assessment.App.Controllers.AdminController">
+            <summary>Admin only: runs the test projects of this solution.</summary>
+        </member>
+        <member name="M:OT.Assessment.App.Controllers.AdminController.GetPlayers(System.String,System.String,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Lists the registered players (players with a login), optionally filtered by part of the
+            login name, with the total each has spent. Use a player's accountId with
+            GET api/player/{accountId}/casino to see their bets.
+            Needs the admin token in the X-Admin-Token header (401 without it, 400 if count is not 1-100).
+            </summary>
+        </member>
+        <member name="M:OT.Assessment.App.Controllers.AdminController.RunTests(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            Runs a test project and returns its output. kind = "unit" runs the unit tests,
+            kind = "load" runs the Tester (load test against the POST endpoint).
+            Needs the admin token (from login) in the X-Admin-Token header.
+            401 without it, 400 for an unknown kind, 409 if a run is already in progress.
+            </summary>
+        </member>
+        <member name="T:OT.Assessment.App.Controllers.AuthController">
+            <summary>Register and login for players, and login for the admin.</summary>
+        </member>
+        <member name="M:OT.Assessment.App.Controllers.AuthController.Register(OT.Assessment.App.Models.RegisterRequest,System.Threading.CancellationToken)">
+            <summary>
+            Creates a new player with a login name and password. 400 if a field is missing or the
+            password is too short, 409 if the login name is already taken.
+            </summary>
+        </member>
+        <member name="M:OT.Assessment.App.Controllers.AuthController.Login(OT.Assessment.App.Models.LoginRequest,System.Threading.CancellationToken)">
+            <summary>
+            Checks a login. Returns the role ("player" or "admin") and the player's account id.
+            The admin also gets a token that the admin endpoints ask for. 401 if the login is wrong.
+            </summary>
+        </member>
+        <member name="T:OT.Assessment.App.Controllers.GamesController">
+            <summary>The games a player can choose from.</summary>
+        </member>
+        <member name="M:OT.Assessment.App.Controllers.GamesController.GetGames(System.Threading.CancellationToken)">
+            <summary>Returns all games (name, provider, theme), ordered by name.</summary>
+        </member>
         <member name="M:OT.Assessment.App.Controllers.PlayerController.PostCasinoBet(OT.Assessment.Common.Messages.CasinoBetMessage,System.Threading.CancellationToken)">
             <summary>
             Sends one bet data to the RabbitMQ queue and waits until RabbitMQ confirms it has received it.
@@ -26,6 +66,27 @@
             <param name="count">How many players to return, from 1 to 100 (default 10).</param>
             <param name="cancellationToken">Cancelled if the client disconnects.</param>
         </member>
+        <member name="T:OT.Assessment.App.Models.RegisterRequest">
+            <summary>Body of POST api/auth/register.</summary>
+        </member>
+        <member name="T:OT.Assessment.App.Models.LoginRequest">
+            <summary>Body of POST api/auth/login.</summary>
+        </member>
+        <member name="T:OT.Assessment.App.Models.LoginResponse">
+            <summary>
+            What the UI gets back after a successful login or registration.
+            Role is "player" or "admin". Token is only filled for the admin.
+            </summary>
+        </member>
+        <member name="T:OT.Assessment.App.Models.PlayerLogin">
+            <summary>A player row as needed for checking a login.</summary>
+        </member>
+        <member name="T:OT.Assessment.App.Models.GameResponse">
+            <summary>One game the player can pick for a bet.</summary>
+        </member>
+        <member name="T:OT.Assessment.App.Models.TestRunResult">
+            <summary>The outcome of one test run started from the admin portal.</summary>
+        </member>
         <member name="T:OT.Assessment.App.Monitoring.ApiMetrics">
             <summary>
             The numbers the API shows on its /metrics page (read by Prometheus, drawn by Grafana).
@@ -39,12 +100,46 @@
             (Grafana would show "No data" instead of 0).
             </summary>
         </member>
+        <member name="T:OT.Assessment.App.Services.AdminSessions">
+            <summary>Remembers the tokens given to the admin after login (kept in memory, lost on restart).</summary>
+        </member>
+        <member name="M:OT.Assessment.App.Services.IPlayerAccountStore.RegisterAsync(System.Guid,System.String,System.String,System.Threading.CancellationToken)">
+            <summary>Creates a player with a login. Returns false if the login name is already taken.</summary>
+        </member>
+        <member name="M:OT.Assessment.App.Services.IPlayerAccountStore.ListPlayersAsync(System.String,System.Int32,System.Threading.CancellationToken)">
+            <summary>
+            Players who have a login, whose login name contains the search text (empty = all),
+            with the total they have spent so far.
+            </summary>
+        </member>
+        <member name="M:OT.Assessment.App.Services.IPlayerAccountStore.FindByLoginNameAsync(System.String,System.Threading.CancellationToken)">
+            <summary>Finds the player with this login name, or null.</summary>
+        </member>
+        <member name="P:OT.Assessment.App.Services.ITestRunner.IsRunning">
+            <summary>True while a test run is in progress (only one run at a time).</summary>
+        </member>
+        <member name="M:OT.Assessment.App.Services.ITestRunner.RunAsync(System.String,System.Threading.CancellationToken)">
+            <summary>Runs "unit" (the unit tests) or "load" (the Tester project) and returns its output.</summary>
+        </member>
+        <member name="T:OT.Assessment.App.Services.PasswordHasher">
+            <summary>Hashes passwords with PBKDF2 and a random salt. Stored as "salt:hash" (both base64).</summary>
+        </member>
+        <member name="T:OT.Assessment.App.Services.ProcessTestRunner">
+            <summary>
+            Runs "dotnet test" (unit) or "dotnet run" on the Tester (load) as a child process and
+            collects what it prints. Builds go to a separate folder, so they never touch the
+            files of the API that is running.
+            </summary>
+        </member>
         <member name="T:OT.Assessment.App.Services.PublishSlot">
             <summary>
             Picks which of the publisher's channels sends the next bet: one after the other, so every channel
             gets the same share of the bets. The counter is converted to an unsigned number first, so the
             result stays inside the range even after the counter wraps around.
             </summary>
+        </member>
+        <member name="T:OT.Assessment.App.Settings.AdminSettings">
+            <summary>The admin login (local development only) and where the solution folder is.</summary>
         </member>
     </members>
 </doc>

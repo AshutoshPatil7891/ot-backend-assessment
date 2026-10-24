@@ -2,6 +2,7 @@ using System.Reflection;
 using OT.Assessment.App.Monitoring;
 using OT.Assessment.App.Services;
 using OT.Assessment.Common.Logging;
+using OT.Assessment.App.Settings;
 using OT.Assessment.Common.Settings;
 using Prometheus;
 using Serilog;
@@ -19,6 +20,19 @@ builder.Services.AddControllers();
 builder.Services.Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"));
 builder.Services.AddSingleton<IBetPublisher, RabbitMqBetPublisher>();
 builder.Services.AddSingleton<IPlayerReader, SqlPlayerReader>();
+
+// login, games list and admin test runner (used by the React UI)
+builder.Services.Configure<AdminSettings>(builder.Configuration.GetSection("Admin"));
+builder.Services.AddSingleton<IPlayerAccountStore, SqlPlayerAccountStore>();
+builder.Services.AddSingleton<IGameReader, SqlGameReader>();
+builder.Services.AddSingleton<AdminSessions>();
+builder.Services.AddSingleton<ITestRunner, ProcessTestRunner>();
+
+// lets the React dev server call the API from the browser
+builder.Services.AddCors(options => options.AddPolicy("ui", policy => policy
+    .WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>())
+    .AllowAnyHeader()
+    .AllowAnyMethod()));
 
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckl
@@ -48,6 +62,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors("ui");
 
 app.UseAuthorization();
 

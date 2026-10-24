@@ -1,0 +1,243 @@
+:root {
+  --baize: #12372a;
+  --baize-dark: #0c261c;
+  --baize-soft: #e3eee8;
+  --paper: #f4f6f3;
+  --panel: #ffffff;
+  --ink: #1b2420;
+  --muted: #5d6b64;
+  --line: #dce2dd;
+  --gold: #b8923a;
+  --error: #a52a24;
+  --error-soft: #fbeceb;
+  --success: #1f7a4d;
+  --success-soft: #e5f4ec;
+
+  /* casino chip colours, used only for the stake chips */
+  --chip-red: #c4302b;
+  --chip-blue: #2b5fa8;
+  --chip-green: #1f7a4d;
+  --chip-black: #1b1f1d;
+
+  --radius: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, -apple-system, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.25;
+}
+
+/* ---------- top bar ---------- */
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px clamp(16px, 3vw, 48px);
+  background: var(--baize);
+  color: #fff;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand h1 {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.brand-chip {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--chip-red);
+  border: 3px dashed rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 2px var(--chip-red);
+}
+
+.user-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--baize-soft);
+  color: var(--baize);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.user-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.user-text small {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* the whole width of the screen, with a comfortable edge */
+.content {
+  width: 100%;
+  margin: 28px 0;
+  padding: 0 clamp(16px, 3vw, 48px);
+}
+
+/* ---------- buttons ---------- */
+
+.button {
+  padding: 9px 18px;
+  border: 1px solid var(--baize);
+  border-radius: 6px;
+  background: var(--baize);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--baize-dark);
+  border-color: var(--baize-dark);
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.button.secondary {
+  background: var(--panel);
+  color: var(--baize);
+  border-color: var(--line);
+}
+
+.button.secondary:hover:not(:disabled) {
+  background: var(--baize-soft);
+  border-color: var(--baize-soft);
+}
+
+.button.ghost {
+  background: transparent;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.button.ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: #fff;
+}
+
+.button.small {
+  padding: 5px 12px;
+  font-size: 13px;
+}
+
+.link {
+  border: none;
+  background: none;
+  color: var(--baize);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ---------- form fields ---------- */
+
+input,
+select {
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+input::placeholder {
+  color: #8a968f;
+}
+
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* ---------- messages ---------- */
+
+.notice {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.notice.error,
+.error {
+  color: var(--error);
+}
+
+.notice.error {
+  background: var(--error-soft);
+}
+
+.notice.success,
+.success {
+  color: var(--success);
+}
+
+.notice.success {
+  background: var(--success-soft);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    padding: 10px 14px;
+  }
+
+  .content {
+    margin: 16px 0;
+  }
+
+  .user-text small {
+    display: none;
+  }
+}
