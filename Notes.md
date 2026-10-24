@@ -127,6 +127,45 @@ Everything in "Setup" (.NET 8 SDK, Docker, SQL Server) plus:
 
 The UI's own packages are installed by `npm install` (React 18.3.1, React DOM, Vite 5.4.11 and the Vite React plugin; versions are pinned in `ui/package.json`). There are no other libraries and nothing to install globally.
 
+**SQL steps for the UI (run once, before starting the API)**
+
+The UI needs the objects from `DatabaseUiSupport.sql`. Without them login, register, the games list and the admin Players tab fail. SQL Server must be running and `OT_Assessment_DB` must already exist (`DatabaseGenerate.sql`, see "Setup").
+
+1. **Run `DatabaseGenerate.sql` first** if you have not already:
+   ```
+   sqlcmd -S localhost -E -C -b -i DatabaseGenerate.sql
+   ```
+2. **Run `DatabaseUiSupport.sql`**, from the repository root. Use either way:
+   - **Command line:**
+     ```
+     sqlcmd -S localhost -E -C -b -i DatabaseUiSupport.sql
+     ```
+     `-S localhost` is the server, `-E` uses your Windows login, `-C` trusts the local certificate, `-b` stops on the first error, `-i` is the script file. No output and no error means success. To check the exit code, run `echo %ERRORLEVEL%` (cmd) or `$LASTEXITCODE` (PowerShell); it must be `0`.
+   - **SQL Server Management Studio (SSMS):** File > Open > File, choose `DatabaseUiSupport.sql`, make sure the database drop-down shows `OT_Assessment_DB` (the script also starts with `USE OT_Assessment_DB`), then press **Execute** (F5). The Messages tab must show no red errors.
+3. **Check that it worked.** Run this (in SSMS, or with `sqlcmd -S localhost -E -C -d OT_Assessment_DB -Q "..."`):
+   ```sql
+   SELECT COLUMN_NAME, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS
+   WHERE TABLE_NAME = 'Player' AND COLUMN_NAME IN ('LoginName', 'PasswordHash');   -- 2 rows, both YES
+
+   SELECT name FROM sys.procedures
+   WHERE name IN ('usp_RegisterPlayer', 'usp_GetPlayerLogin', 'usp_GetGames', 'usp_GetRegisteredPlayers');   -- 4 rows
+
+   SELECT COUNT(*) AS RealGames FROM Game
+   WHERE Name IN ('Starburst', 'Book of Dead', 'Gonzo''s Quest', 'Sweet Bonanza', 'Mega Moolah');   -- 5
+   ```
+   Then start the API and open https://localhost:7120/api/games: it must return a list of games.
+4. **What the script does (and does not do).** It adds two nullable columns (`LoginName`, `PasswordHash`) and a plain index on `Player`, five real games, and four stored procedures (`usp_RegisterPlayer`, `usp_GetPlayerLogin`, `usp_GetGames`, `usp_GetRegisteredPlayers`). It never drops data, never edits an existing row, and does not touch `DatabaseGenerate.sql`'s tables, procedures or the Consumer's insert. It is safe to run any number of times: every step checks first, and the procedures are replaced with the script's version.
+5. **Look at the logins** (optional): `SELECT TOP 10 LoginName, LEFT(PasswordHash, 12) AS HashStart FROM Player WHERE LoginName IS NOT NULL;`. A new player created with "Create an account" appears here with a hash, never the plain password.
+6. **Starting again from empty data.** Dropping `OT_Assessment_DB` and re-running `DatabaseGenerate.sql` removes the login columns, the five games and every login. Run `DatabaseUiSupport.sql` again afterwards, then register players through the UI. Players created by the Tester have no login, so they cannot log in and are not listed on the admin Players tab (they still show in Top spenders).
+
+| SQL problem | Cause and fix |
+|---|---|
+| `Cannot open database "OT_Assessment_DB"` or `Invalid object name 'Player'` | `DatabaseGenerate.sql` was not run. Run it first. |
+| `Login timeout expired` or `A network-related error` | SQL Server is not running. Start the service `MSSQLSERVER` (Services app) or the SQL Server instance you use, and check the `-S` name. |
+| `certificate chain was issued by an authority that is not trusted` | Add `-C` to `sqlcmd` (local development only). |
+| `'sqlcmd' is not recognized` | The SQL command-line tools are not installed. Install "sqlcmd" or use SSMS to run the script. |
+| `Error 1934 ... QUOTED_IDENTIFIER` when a bet is saved | An old version of the script created a filtered index. Run the current `DatabaseUiSupport.sql`: it drops that index. |
+
 **How to run**
 
 1. Start RabbitMQ (`docker\RabbitMQ\docker-up.bat`), then the API (`dotnet run --launch-profile https` in `src\OT.Assessment.App`) and the Consumer (`dotnet run` in `src\OT.Assessment.Consumer`), as described in "Setup". Without the Consumer a bet is accepted but never appears in "My bets".
